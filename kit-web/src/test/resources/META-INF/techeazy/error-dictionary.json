@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "product": "demo",
+  "description": "A demo product dictionary, to test the layering.",
+  "entries": [
+    {
+      "code": "demo-thing-not-found",
+      "kind": "problem",
+      "status": 404,
+      "category": "not-found",
+      "title": "Thing not found",
+      "description": "No thing has that id.",
+      "action": "Use the id returned when the thing was created.",
+      "retryable": false,
+      "raisedBy": [
+        "demo-svc"
+      ],
+      "fhirIssueType": "not-found",
+      "since": "0.1.0"
+    },
+    {
+      "code": "demo-thing-archived",
+      "kind": "problem",
+      "status": 409,
+      "category": "conflict",
+      "title": "Thing is archived",
+      "description": "An archived thing cannot be changed.",
+      "action": "Restore it first.",
+      "retryable": false,
+      "raisedBy": [
+        "demo-svc"
+      ],
+      "fhirIssueType": "conflict",
+      "since": "0.1.0"
+    },
+    {
+      "code": "demo-thing-name-invalid",
+      "kind": "problem",
+      "status": 422,
+      "category": "validation",
+      "title": "Thing name not valid",
+      "description": "The name breaks a rule.",
+      "action": "Send a valid name.",
+      "retryable": false,
+      "raisedBy": [
+        "demo-svc"
+      ],
+      "fhirIssueType": "invalid",
+      "since": "0.1.0"
+    }
+  ]
+}

@@ -1,0 +1,229 @@
+{
+  "version": 1,
+  "description": "Generic codes every TechEazyHQ product raises the same way. Products add their own in META-INF/techeazy/error-dictionary.json. Do not rename or remove a released code.",
+  "entries": [
+    {
+      "code": "malformed-request",
+      "kind": "problem",
+      "status": 400,
+      "category": "validation",
+      "title": "Request could not be read",
+      "description": "The body or a parameter could not be read or contains text the platform refuses.",
+      "action": "Send a well-formed request as the API describes.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "structure",
+      "since": "0.1.0"
+    },
+    {
+      "code": "invalid-parameter",
+      "kind": "problem",
+      "status": 400,
+      "category": "validation",
+      "title": "Parameter not valid",
+      "description": "A query or path parameter has the wrong form. The detail names it.",
+      "action": "Correct the parameter named in the detail.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "invalid",
+      "since": "0.1.0"
+    },
+    {
+      "code": "validation-failed",
+      "kind": "problem",
+      "status": 422,
+      "category": "validation",
+      "title": "Request not valid",
+      "description": "One or more fields break a rule. The errors list names each field and its code.",
+      "action": "Correct each field in the errors list and send the request again.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "value",
+      "since": "0.1.0"
+    },
+    {
+      "code": "unauthenticated",
+      "kind": "problem",
+      "status": 401,
+      "category": "authentication",
+      "title": "Sign-in required",
+      "description": "The request carries no valid credentials.",
+      "action": "Sign in and send the request with a valid token.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "login",
+      "since": "0.1.0"
+    },
+    {
+      "code": "invalid-token",
+      "kind": "problem",
+      "status": 401,
+      "category": "authentication",
+      "title": "Token not valid",
+      "description": "The token is expired, malformed, from another issuer or not meant for this service.",
+      "action": "Sign in again to get a new token.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "security",
+      "since": "0.1.0"
+    },
+    {
+      "code": "forbidden",
+      "kind": "problem",
+      "status": 403,
+      "category": "authorization",
+      "title": "Not allowed",
+      "description": "The caller is signed in but may not do this.",
+      "action": "Ask an administrator for the access you need.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "forbidden",
+      "since": "0.1.0"
+    },
+    {
+      "code": "not-found",
+      "kind": "problem",
+      "status": 404,
+      "category": "not-found",
+      "title": "Not found",
+      "description": "There is nothing at that address or with that id.",
+      "action": "Check the address or id.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "not-found",
+      "since": "0.1.0"
+    },
+    {
+      "code": "conflict",
+      "kind": "problem",
+      "status": 409,
+      "category": "conflict",
+      "title": "Conflicting change",
+      "description": "The request conflicts with the current state, for example a newer version exists.",
+      "action": "Read the current state and send the change again.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "conflict",
+      "since": "0.1.0"
+    },
+    {
+      "code": "request-replayed",
+      "kind": "problem",
+      "status": 409,
+      "category": "conflict",
+      "title": "Request already used",
+      "description": "A signed or idempotent request was sent again with the same key or nonce.",
+      "action": "Send a new request with a new nonce or key.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "duplicate",
+      "since": "0.1.0"
+    },
+    {
+      "code": "rate-limit-exceeded",
+      "kind": "problem",
+      "status": 429,
+      "category": "rate-limit",
+      "title": "Too many requests",
+      "description": "The caller sent more requests than allowed in a short time.",
+      "action": "Wait for the time in the Retry-After header, then try again.",
+      "retryable": true,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "throttled",
+      "since": "0.1.0"
+    },
+    {
+      "code": "quota-exceeded",
+      "kind": "problem",
+      "status": 429,
+      "category": "rate-limit",
+      "title": "Allowance used up",
+      "description": "The tenant has used its allowance for this period.",
+      "action": "Wait for the next period or ask for a larger plan.",
+      "retryable": true,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "throttled",
+      "since": "0.1.0"
+    },
+    {
+      "code": "dependency-unavailable",
+      "kind": "problem",
+      "status": 503,
+      "category": "dependency",
+      "title": "A required service is unavailable",
+      "description": "A service this request depends on cannot be reached right now. This is not a decision about the request.",
+      "action": "Try again after the time in the Retry-After header.",
+      "retryable": true,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "transient",
+      "since": "0.1.0"
+    },
+    {
+      "code": "internal-error",
+      "kind": "problem",
+      "status": 500,
+      "category": "internal",
+      "title": "Something went wrong",
+      "description": "The platform failed unexpectedly. Nothing about the failure is sent to the caller.",
+      "action": "Try again later and quote the correlation id if it keeps happening.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "exception",
+      "since": "0.1.0"
+    },
+    {
+      "code": "TZ-ERRDICT-UNLISTED",
+      "kind": "log",
+      "category": "operations",
+      "title": "Problem code not in the dictionary",
+      "description": "A problem was raised with a code the error dictionary does not list.",
+      "action": "Add the code to the product dictionary and raise it from the code.",
+      "retryable": false,
+      "level": "ERROR",
+      "raisedBy": [
+        "platform"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "code": "TZ-INTERNAL-ERROR",
+      "kind": "log",
+      "category": "operations",
+      "title": "Unexpected error",
+      "description": "A request ended with an unexpected error. The correlation id ties the log line to the caller's answer.",
+      "action": "Find the log line by the correlation id and fix the cause.",
+      "retryable": false,
+      "level": "ERROR",
+      "raisedBy": [
+        "platform"
+      ],
+      "since": "0.1.0"
+    }
+  ]
+}
