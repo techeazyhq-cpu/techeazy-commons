@@ -46,10 +46,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   <li>input the database refuses for what it contains (a NUL character, text it cannot encode, a value too long or out of range,
  *       a malformed number or date): also 400 {@code malformed-request}, since the caller's text is the fault, not the platform's;</li>
  *   <li>an exception nobody expected: 500 {@code internal-error}, with nothing about it in the answer, and the exception
- *       logged as {@code [TZ-INTERNAL-ERROR]} with the correlation id the caller was given.</li>
+ *       logged as {@code [TZ-INTERNAL-ERROR]} with the correlation id the caller was given;</li>
+ *   <li>a request nobody can serve, as raised by the router and the codecs: 404 {@code not-found} (unknown route), 405
+ *       {@code method-not-allowed} (with its Allow header), 406 {@code not-acceptable}, 415 {@code unsupported-media-type}.</li>
  * </ul>
- * It leaves alone what is already someone's to answer: other {@code ResponseStatusException}s (unknown route, wrong
- * method), Spring Security's exceptions, a response already on its way, and a client that went away.
+ * It leaves alone what is already someone's to answer: other {@code ResponseStatusException}s, Spring Security's exceptions, a response already on its way, and a client that went away.
  * Ordered after the handlers for {@link DomRuleViolation} and dependency outages, and ahead of Spring's default.
  */
 @Order(-2)
@@ -66,7 +67,13 @@ public class FallbackProblemWebExceptionHandler implements WebExceptionHandler {
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
         ServerHttpResponse response = exchange.getResponse();
-        if (response.isCommitted() || isNotOurs(ex)) {
+        if (response.isCommitted()) {
+            return Mono.error(ex);
+        }
+        if (ex instanceof ResponseStatusException rse && ROUTING_CODES.containsKey(rse.getStatusCode().value())) {
+            return routingProblem(exchange, rse);
+        }
+        if (isNotOurs(ex)) {
             return Mono.error(ex);
         }
         if (ex instanceof ServerWebInputException || refusedAsInput(ex)) {
@@ -79,6 +86,18 @@ public class FallbackProblemWebExceptionHandler implements WebExceptionHandler {
                 Problems.correlationId(exchange), ex);
         return write(exchange, HttpStatus.INTERNAL_SERVER_ERROR, Problems.body("internal-error", 500,
                 "Nothing more is shown here. Quote the correlation id if you report it.", Problems.correlationId(exchange)));
+    }
+
+    /** The answers the router and the codecs give for a request nobody can serve, as dictionary codes. */
+    private static final Map<Integer, String> ROUTING_CODES = Map.of(
+            404, "not-found", 405, "method-not-allowed", 406, "not-acceptable", 415, "unsupported-media-type");
+
+    private Mono<Void> routingProblem(ServerWebExchange exchange, ResponseStatusException rse) {
+        int status = rse.getStatusCode().value();
+        // headers the exception carries, such as Allow on a 405 or Accept on a 415, tell the caller what would work
+        rse.getHeaders().forEach((name, values) -> exchange.getResponse().getHeaders().addAll(name, values));
+        return write(exchange, HttpStatus.valueOf(status), Problems.body(ROUTING_CODES.get(status), status, null,
+                Problems.correlationId(exchange)));
     }
 
     private Mono<Void> write(ServerWebExchange exchange, HttpStatus status, Map<String, Object> problem) {

@@ -108,6 +108,51 @@
       "since": "0.1.0"
     },
     {
+      "code": "method-not-allowed",
+      "kind": "problem",
+      "status": 405,
+      "category": "validation",
+      "title": "Method not allowed",
+      "description": "The address exists but does not accept that HTTP method.",
+      "action": "Use a method the address accepts; the Allow header lists them.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "not-supported",
+      "since": "0.1.0"
+    },
+    {
+      "code": "not-acceptable",
+      "kind": "problem",
+      "status": 406,
+      "category": "validation",
+      "title": "Not acceptable",
+      "description": "The service cannot answer in any of the formats the Accept header asks for.",
+      "action": "Ask for application/json, or remove the Accept header.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "not-supported",
+      "since": "0.1.0"
+    },
+    {
+      "code": "unsupported-media-type",
+      "kind": "problem",
+      "status": 415,
+      "category": "validation",
+      "title": "Unsupported media type",
+      "description": "The body is in a format the address does not accept.",
+      "action": "Send the body as application/json.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "not-supported",
+      "since": "0.1.0"
+    },
+    {
       "code": "conflict",
       "kind": "problem",
       "status": 409,

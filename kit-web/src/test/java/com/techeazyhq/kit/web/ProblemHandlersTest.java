@@ -182,7 +182,7 @@ class ProblemHandlersTest {
     @Test
     void whatIsAlreadySomeoneElsesToAnswerIsPassedOn() {
         FallbackProblemWebExceptionHandler handler = new FallbackProblemWebExceptionHandler(JSON);
-        for (Throwable ex : new Throwable[] {new ResponseStatusException(HttpStatus.NOT_FOUND),
+        for (Throwable ex : new Throwable[] {new ResponseStatusException(HttpStatus.CONFLICT),
                 new java.util.concurrent.CancellationException("client left")}) {
             MockServerWebExchange exchange = exchange();
 
@@ -192,6 +192,43 @@ class ProblemHandlersTest {
             assertEquals(ex, passed);
             assertNull(exchange.getResponse().getStatusCode(), "nothing was written for " + ex.getClass().getSimpleName());
         }
+    }
+
+    @Test
+    void aRequestNobodyCanServeIsAProblemWithADictionaryCode() throws Exception {
+        Object[][] cases = {
+                {new ResponseStatusException(HttpStatus.NOT_FOUND), 404, "not-found"},
+                {new org.springframework.web.server.MethodNotAllowedException(
+                        org.springframework.http.HttpMethod.DELETE, java.util.List.of(org.springframework.http.HttpMethod.GET)),
+                        405, "method-not-allowed"},
+                {new org.springframework.web.server.NotAcceptableStatusException("no"), 406, "not-acceptable"},
+                {new org.springframework.web.server.UnsupportedMediaTypeStatusException("no"), 415, "unsupported-media-type"}};
+        for (Object[] c : cases) {
+            MockServerWebExchange exchange = exchange();
+
+            new FallbackProblemWebExceptionHandler(JSON).handle(exchange, (Throwable) c[0]).block();
+
+            assertEquals((int) c[1], exchange.getResponse().getStatusCode().value());
+            assertEquals(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON,
+                    exchange.getResponse().getHeaders().getContentType());
+            String raw = exchange.getResponse().getBodyAsString().block();
+            Map<String, Object> problem = JSON.readValue(raw, new TypeReference<>() {
+            });
+            assertEquals(c[2], problem.get("code"));
+            assertEquals("corr-123", problem.get("correlationId"));
+            assertEquals(c[1], problem.get("status"));
+            assertTrue(ErrorDictionary.instance().find((String) c[2]).isPresent());
+        }
+    }
+
+    @Test
+    void aWrongMethodSaysWhichMethodsWouldWork() {
+        MockServerWebExchange exchange = exchange();
+
+        new FallbackProblemWebExceptionHandler(JSON).handle(exchange, new org.springframework.web.server.MethodNotAllowedException(
+                org.springframework.http.HttpMethod.DELETE, java.util.List.of(org.springframework.http.HttpMethod.GET))).block();
+
+        assertEquals("GET", exchange.getResponse().getHeaders().getFirst("Allow"));
     }
 
     @Test
