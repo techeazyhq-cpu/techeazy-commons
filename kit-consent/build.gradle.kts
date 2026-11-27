@@ -1,0 +1,39 @@
+/*
+ * Copyright 2026 Vasantha Kumar
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * @author Vasantha Kumar <vasantha.kumar@hotmail.com>
+ */
+
+// The Consent Port: the one boundary a product's services call to ask whether a purpose may be processed. No consent
+// feature lives here (notices, lifecycle, receipts are the Consent Manager's); a product's adapter calls it. The fail-closed
+// enforcer and the call-site guard sit on top. Adapters prove themselves against the shared contract test in this module's
+// test fixtures. First used by OneGreenHealth.
+plugins {
+    id("java-library")
+    id("java-test-fixtures")
+}
+
+dependencies {
+    api("io.projectreactor:reactor-core:3.8.8")
+
+    testImplementation(platform("org.junit:junit-bom:5.14.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("io.projectreactor:reactor-test:3.8.8")
+
+    testFixturesApi(platform("org.junit:junit-bom:5.14.4"))
+    testFixturesApi("org.junit.jupiter:junit-jupiter-api")
+    testFixturesApi("io.projectreactor:reactor-test:3.8.8")
+}
