@@ -33,4 +33,4 @@ dependencyResolutionManagement {
     }
 }
 
-include("kit-dom", "kit-web", "kit-test")
+include("kit-dom", "kit-web", "kit-test", "kit-claims")
