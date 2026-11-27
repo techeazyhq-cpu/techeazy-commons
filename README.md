@@ -30,6 +30,7 @@ Licensed under the [Apache License 2.0](LICENSE).
 | `kit-web` | Spring WebFlux cross-cutting: **RFC 9457 `problem+json` errors from a layered error dictionary**, FHIR `OperationOutcome` answers, correlation IDs | `com.techeazyhq.kit:kit-web` |
 | `kit-test` | Architecture tests (the Clean Architecture dependency rule as a normal test) and a PostgreSQL Testcontainers base | `com.techeazyhq.kit:kit-test` |
 | `kit-claims` | The caller's **claims** (tenant, facilities, roles, practitioner and registry id, purpose of use) as one validated value, and a strict parser for the claims of an already verified token; names configurable per identity provider. No dependencies | `com.techeazyhq.kit:kit-claims` |
+| `kit-latency` | A **latency test kit**: thread-safe timing samples with nearest-rank percentiles, SLO presets (p95 300 ms reads and 600 ms writes, p99 1 s and 2 s, with a 70% budget rule), a gate that fails a build when a service is too slow, and a per-step Markdown and JSON report. A test dependency only; no dependencies | `com.techeazyhq.kit:kit-latency` |
 | `build-logic` | Gradle convention plugins: `techeazy.spring-service`, `techeazy.clean-arch` | plugin ids with the same names |
 | `tools/error-dictionary` | CI check and catalogue generator for a product's error dictionary | `node tools/error-dictionary/error-dictionary.mjs --config <file>` |
 | `tools/license-headers` | Checks (and with `--fix` adds) the Apache 2.0 header on every tracked source file | `node tools/license-headers/license-headers.mjs` |
