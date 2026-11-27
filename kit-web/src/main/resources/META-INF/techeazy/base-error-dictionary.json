@@ -288,6 +288,21 @@
       "since": "0.1.0"
     },
     {
+      "code": "access-unavailable",
+      "kind": "problem",
+      "status": 503,
+      "category": "dependency",
+      "title": "Access could not be checked",
+      "description": "The access policy did not answer in time, failed, or could not decide. This is not a refusal: nothing was done.",
+      "action": "Wait for the time in the Retry-After header and send the request again.",
+      "retryable": true,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "transient",
+      "since": "0.1.0"
+    },
+    {
       "code": "internal-error",
       "kind": "problem",
       "status": 500,
