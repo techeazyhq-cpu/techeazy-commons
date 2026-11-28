@@ -47,6 +47,7 @@ Licensed under the [Apache License 2.0](LICENSE).
 | `build-logic` | Gradle convention plugins: `techeazy.spring-service`, `techeazy.clean-arch` | plugin ids with the same names |
 | `tools/error-dictionary` | CI check and catalogue generator for a product's error dictionary | `node tools/error-dictionary/error-dictionary.mjs --config <file>` |
 | `tools/license-headers` | Checks (and with `--fix` adds) the Apache 2.0 header on every tracked source file | `node tools/license-headers/license-headers.mjs` |
+| `tools/contract` | Contract checks for any product: `schema-compat.mjs` (FULL, BACKWARD or FORWARD compatibility of event JSON Schemas against the released ones; with `--class-key` a data class that goes up is breaking) and `spectral-base.yaml` (the API standards as a Spectral ruleset: named and secured operations, 401 and 403 documented, errors as `application/problem+json`, https servers). A product extends the ruleset with its own rules and runs oasdiff on its OpenAPI document | `node tools/contract/schema-compat.mjs <released> <current>` |
 | `infra/maven-repo` | A local Maven repository in Docker for these libraries | `docker compose -f infra/maven-repo/compose.yml up -d` |
 
 ## Build and test
@@ -56,6 +57,7 @@ Requires JDK 21 and, for the tools, Node 20 or newer. Docker is needed only for 
 ```bash
 ./gradlew build                                              # compile, test, javadoc and sources jars
 node --test tools/error-dictionary/error-dictionary.test.mjs
+node --test tools/contract/schema-compat.test.mjs
 ```
 
 ## Use it in a product
