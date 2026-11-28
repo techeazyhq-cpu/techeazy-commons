@@ -19,6 +19,7 @@
 package com.techeazyhq.kit.requestcontext;
 
 import com.techeazyhq.kit.consent.web.PurposeOfUseWebFilter;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientRequest;
@@ -55,40 +56,43 @@ public final class OutboundHttp {
 
     /** HTTPS and HTTP/2 only, and no host is internal: nothing carries the caller's identity. */
     public static WebClient.Builder webClientBuilder() {
-        return webClientBuilder(httpClient(), Set.of());
-    }
-
-    /** As above, and calls to {@code internalHosts} carry the caller's identity (see {@link #relay}). */
-    public static WebClient.Builder webClientBuilder(Set<String> internalHosts) {
-        return webClientBuilder(httpClient(), internalHosts);
-    }
-
-    /** As above with a given Netty client, for a test or a product that tunes it. The default policy for time, retries and the circuit. */
-    public static WebClient.Builder webClientBuilder(HttpClient client, Set<String> internalHosts) {
-        return webClientBuilder(client, OutboundPolicy.defaults(), internalHosts);
-    }
-
-    /** As above with the policy a product chose (TM-15): timeouts, bounded retries, a circuit breaker per host. */
-    public static WebClient.Builder webClientBuilder(OutboundPolicy policy, Set<String> internalHosts) {
-        return webClientBuilder(httpClient(policy), policy, internalHosts);
-    }
-
-    public static WebClient.Builder webClientBuilder(HttpClient client, OutboundPolicy policy, Set<String> internalHosts) {
-        return WebClient.builder().clientConnector(new ReactorClientHttpConnector(client)).filter(httpsOnly())
-                .filter(relay(internalHosts)).filter(new Resilience(policy).filter());
+        return webClientBuilder(OutboundPolicy.defaults(), Map.of(), null);
     }
 
     /**
-     * What a gateway does on the way to an internal service: sends the caller's own bearer token, correlation id and purpose of
-     * use on (the service reads the tenant and the rest of the claims from the token and trusts nothing the caller wrote in a
-     * header). Only to the hosts listed: a call to anyone else, an AI provider say, never carries the caller's token. A call to
-     * an internal host with no request context is a bug and fails, rather than going out anonymous or as someone else. A token
-     * set by the code that built the request is replaced, not trusted.
+     * Calls to {@code internalTargets} carry who is calling, as a token <b>exchanged</b> for the target (see {@link #relay}); every call
+     * has the timeouts, bounded retries and circuit breaker of the policy (TM-15). Internal targets need a {@code TokenExchange}.
      */
-    public static ExchangeFilterFunction relay(Set<String> internalHosts) {
-        Set<String> hosts = Set.copyOf(internalHosts);
+    public static WebClient.Builder webClientBuilder(OutboundPolicy policy, Map<String, OutboundTarget> internalTargets, TokenExchange exchange) {
+        return webClientBuilder(httpClient(policy), policy, internalTargets, exchange);
+    }
+
+    /** As above with a given Netty client, for a test or a product that tunes it. */
+    public static WebClient.Builder webClientBuilder(HttpClient client, OutboundPolicy policy, Map<String, OutboundTarget> internalTargets,
+                                                     TokenExchange exchange) {
+        return WebClient.builder().clientConnector(new ReactorClientHttpConnector(client)).filter(httpsOnly())
+                .filter(relay(internalTargets, exchange)).filter(new Resilience(policy).filter());
+    }
+
+    /**
+     * What a gateway does on the way to an internal service: sends a bearer token <b>exchanged</b> for that service (its audience and the
+     * scopes of the call), the correlation id and the purpose of use. The caller's own token is never passed on: it is valid for every
+     * service that accepts the realm's tokens, so one that received it could replay it against another (#613). The service reads the
+     * tenant and the rest of the claims from the exchanged token and trusts nothing the caller wrote in a header.
+     *
+     * <p>Only the hosts listed receive anything: a call to anyone else, an AI provider say, carries nothing of the caller's. A call to an
+     * internal host with no request context is a bug and fails, rather than going out anonymous or as someone else; so does a call whose
+     * token could not be exchanged: there is no fallback to the caller's token. A token set by the code that built the request is
+     * replaced, not trusted.
+     */
+    public static ExchangeFilterFunction relay(Map<String, OutboundTarget> internalTargets, TokenExchange exchange) {
+        Map<String, OutboundTarget> targets = Map.copyOf(internalTargets);
+        if (!targets.isEmpty() && exchange == null) {
+            throw new IllegalArgumentException("internal services need a token exchange: the caller's own token is not passed on");
+        }
         return (request, next) -> {
-            if (!hosts.contains(request.url().getHost())) {
+            OutboundTarget target = targets.get(request.url().getHost().toLowerCase(java.util.Locale.ROOT));
+            if (target == null) {
                 return next.exchange(request);
             }
             return Mono.deferContextual(ctx -> {
@@ -97,16 +101,18 @@ public final class OutboundHttp {
                     return Mono.error(new IllegalStateException(
                             "Call to internal host " + request.url().getHost() + " without a request context"));
                 }
-                ClientRequest relayed = ClientRequest.from(request).headers(headers -> {
-                    headers.setBearerAuth(caller.bearerToken());
-                    if (caller.correlationId() != null) {
-                        headers.set(CORRELATION_HEADER, caller.correlationId());
-                    }
-                    if (caller.purpose() != null) {
-                        headers.set(PurposeOfUseWebFilter.HEADER, caller.purpose());
-                    }
-                }).build();
-                return next.exchange(relayed);
+                return exchange.exchange(caller, target).flatMap(narrowed -> {
+                    ClientRequest relayed = ClientRequest.from(request).headers(headers -> {
+                        headers.setBearerAuth(narrowed);
+                        if (caller.correlationId() != null) {
+                            headers.set(CORRELATION_HEADER, caller.correlationId());
+                        }
+                        if (caller.purpose() != null) {
+                            headers.set(PurposeOfUseWebFilter.HEADER, caller.purpose());
+                        }
+                    }).build();
+                    return next.exchange(relayed);
+                });
             });
         };
     }
