@@ -69,8 +69,9 @@ class LeakScannerTest {
         assertFalse(scan("token " + HexFormat.of().formatHex(diagnosis.getBytes(StandardCharsets.UTF_8))).isEmpty(), "hex");
         assertFalse(scan("AsharaoMenon").isEmpty(), "without spaces and dashes");
         assertFalse(scan("call 919876543210 now").isEmpty(), "digits only");
-        assertFalse(scan("{\"note\":\"" + hindi.chars().collect(StringBuilder::new,
-                (b, c) -> b.append(String.format("\\u%04x", c)), StringBuilder::append) + "\"}").isEmpty(), "unicode escapes");
+        StringBuilder escaped = new StringBuilder();
+        hindi.chars().forEach(c -> escaped.append(c > 126 ? String.format("\\u%04x", c) : String.valueOf((char) c)));
+        assertFalse(scan("{\"note\":\"" + escaped + "\"}").isEmpty(), "unicode escapes");
     }
 
     @Test
