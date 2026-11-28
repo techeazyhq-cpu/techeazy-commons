@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.techeazyhq.kit.claims.Claims;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ class RequestContextTest {
     private static final UUID TENANT = UUID.randomUUID();
 
     private static RequestContext of(UUID tenant, String purpose) {
-        Claims claims = new Claims("u1", tenant, Set.of("f1"), Set.of("physician"), null, null, purpose);
+        Claims claims = new Claims("u1", tenant, Set.of("staff"), Map.of(), purpose);
         return new RequestContext("corr-1", "secret.token.value", claims);
     }
 
@@ -95,7 +96,7 @@ class RequestContextTest {
 
     @Test
     void aContextNeedsItsTokenAndItsClaims() {
-        Claims claims = new Claims("u1", TENANT, Set.of(), Set.of(), null, null, null);
+        Claims claims = new Claims("u1", TENANT, Set.of());
 
         assertThrows(NullPointerException.class, () -> new RequestContext("c", null, claims));
         assertThrows(NullPointerException.class, () -> new RequestContext("c", "t", null));

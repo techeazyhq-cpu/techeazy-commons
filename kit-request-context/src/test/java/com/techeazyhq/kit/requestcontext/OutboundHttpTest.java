@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.techeazyhq.kit.claims.Claims;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -40,7 +41,7 @@ class OutboundHttpTest {
 
     private static RequestContext caller(String purpose, String correlationId) {
         return new RequestContext(correlationId, "caller-token",
-                new Claims("u1", UUID.randomUUID(), Set.of("f1"), Set.of("physician"), null, null, purpose));
+                new Claims("u1", UUID.randomUUID(), Set.of("staff"), Map.of(), purpose));
     }
 
     private static final RequestContext CALLER = caller("CLAIMS_PROCESSING", "corr-9");

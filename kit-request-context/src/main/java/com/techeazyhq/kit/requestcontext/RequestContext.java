@@ -29,8 +29,8 @@ import reactor.core.publisher.Mono;
  * operators, scheduler hops, streaming responses and outbound calls without being passed as a parameter or kept in a
  * thread-local (which a reactive request would lose, or worse, leak to another request).
  *
- * <p>{@code claims} is the caller as the verified token states it (person, tenant, facilities, roles, practitioner and
- * registry id) with the request's purpose of use added. A service never takes any of it from a header or a body: a downstream
+ * <p>{@code claims} is the caller as the verified token states it (person, tenant, roles and the product's
+ * attributes) with the request's purpose of use added. A service never takes any of it from a header or a body: a downstream
  * service is sent the same token and reads the same claims from it. The tenant is never a default, and never a header.
  *
  * <p>The bearer token travels with the context only so that a gateway can relay it to internal hosts (see

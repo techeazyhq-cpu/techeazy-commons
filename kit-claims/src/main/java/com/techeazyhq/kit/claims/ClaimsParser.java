@@ -19,6 +19,7 @@
 package com.techeazyhq.kit.claims;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,8 +32,8 @@ import java.util.UUID;
  * {@link Valid} or {@link Invalid} with a code the caller can log (never the offending value, which may be hostile text).
  *
  * <p>A token without a tenant, or with a tenant that is not a UUID, is invalid: a signed-in caller who belongs to no tenant is
- * allowed nothing, and there is never a default tenant. Facilities and roles may be absent (none granted); when present they
- * must be plain tokens, a string or a list of strings, within the limits of {@link Claims}.
+ * allowed nothing, and there is never a default tenant. Roles and the product's attributes may be absent (none granted); when
+ * present they must be plain tokens, a string or a list of strings, within the limits of {@link Claims}.
  */
 public final class ClaimsParser {
 
@@ -54,10 +55,9 @@ public final class ClaimsParser {
     public static final String CODE_NO_SUBJECT = "no-subject";
     public static final String CODE_NO_TENANT = "no-tenant";
     public static final String CODE_BAD_TENANT = "bad-tenant";
-    public static final String CODE_BAD_FACILITIES = "bad-facilities";
     public static final String CODE_BAD_ROLES = "bad-roles";
-    public static final String CODE_BAD_PRACTITIONER = "bad-practitioner";
-    public static final String CODE_BAD_REGISTRY_ID = "bad-registry-id";
+    /** One of the product's attributes is present and is not plain tokens. The code does not say which or what it held. */
+    public static final String CODE_BAD_ATTRIBUTE = "bad-attribute";
 
     public static Result parse(Map<String, ?> tokenClaims) {
         return parse(tokenClaims, ClaimNames.defaults());
@@ -79,23 +79,21 @@ public final class ClaimsParser {
             if (tenantId == null) {
                 return new Invalid(CODE_BAD_TENANT);
             }
-            Set<String> facilities = tokens(tokenClaims.get(names.facilityIds()), Claims.MAX_FACILITIES);
-            if (facilities == null) {
-                return new Invalid(CODE_BAD_FACILITIES);
-            }
             Set<String> roles = tokens(walk(tokenClaims, names.rolesPath()), Claims.MAX_ROLES);
             if (roles == null) {
                 return new Invalid(CODE_BAD_ROLES);
             }
-            Object practitioner = tokenClaims.get(names.practitionerId());
-            if (practitioner != null && !(practitioner instanceof String p && Claims.isToken(p))) {
-                return new Invalid(CODE_BAD_PRACTITIONER);
+            Map<String, Set<String>> attributes = new LinkedHashMap<>();
+            for (Map.Entry<String, String> attribute : names.attributes().entrySet()) {
+                Set<String> values = tokens(tokenClaims.get(attribute.getValue()), Claims.MAX_VALUES);
+                if (values == null) {
+                    return new Invalid(CODE_BAD_ATTRIBUTE);
+                }
+                if (!values.isEmpty()) {
+                    attributes.put(attribute.getKey(), values);
+                }
             }
-            Object registry = tokenClaims.get(names.hprId());
-            if (registry != null && !(registry instanceof String r && Claims.isToken(r))) {
-                return new Invalid(CODE_BAD_REGISTRY_ID);
-            }
-            return new Valid(new Claims(subject, tenantId, facilities, roles, (String) practitioner, (String) registry, null));
+            return new Valid(new Claims(subject, tenantId, roles, attributes, null));
         } catch (RuntimeException e) {
             // nothing above should throw; whatever does, the answer is still "not valid", never an exception
             return new Invalid(CODE_NO_CLAIMS);

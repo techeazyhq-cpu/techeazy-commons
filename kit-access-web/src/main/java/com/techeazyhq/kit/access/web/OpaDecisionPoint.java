@@ -45,7 +45,7 @@ public final class OpaDecisionPoint implements PolicyDecisionPoint {
     /**
      * @param builder  the client builder (so a product can supply its own connector or filters in a test)
      * @param baseUrl  the OPA server, for example {@code http://localhost:8181}
-     * @param rulePath the decision rule, for example {@code ogh/access/decision}
+     * @param rulePath the decision rule, for example {@code acme/access/decision}
      */
     public OpaDecisionPoint(WebClient.Builder builder, String baseUrl, String rulePath) {
         Objects.requireNonNull(builder, "builder");
@@ -57,7 +57,7 @@ public final class OpaDecisionPoint implements PolicyDecisionPoint {
             throw new IllegalArgumentException("The policy server must be https, or http on the loopback only: " + uri.getHost());
         }
         if (rulePath == null || !rulePath.matches("[A-Za-z0-9_]+(/[A-Za-z0-9_]+)*")) {
-            throw new IllegalArgumentException("rulePath must look like ogh/access/decision");
+            throw new IllegalArgumentException("rulePath must look like acme/access/decision");
         }
         this.client = builder.baseUrl(baseUrl).build();
         this.path = "/v1/data/" + rulePath;

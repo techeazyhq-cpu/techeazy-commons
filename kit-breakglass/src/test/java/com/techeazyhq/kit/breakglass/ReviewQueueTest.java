@@ -45,8 +45,8 @@ class ReviewQueueTest {
     private final InMemoryReviewQueue queue = new InMemoryReviewQueue(clock);
 
     private static BreakGlassRecord at(UUID tenant, UUID accessor, Instant when) {
-        return new BreakGlassRecord(UUID.randomUUID(), tenant, UUID.randomUUID(), accessor, "patient-77", "encounter", "read",
-                "unconscious_patient", "Unconscious on arrival, no relatives, history unknown", when, "corr-1");
+        return new BreakGlassRecord(UUID.randomUUID(), tenant, UUID.randomUUID(), accessor, "subject-77", "account", "read",
+                "locked_out_urgent", "Caller could not be reached and the transfer would have failed", when, "corr-1");
     }
 
     @Test
@@ -112,7 +112,7 @@ class ReviewQueueTest {
     void aBreakGlassThatIsNotJustifiedIsEscalated() {
         ReviewItem item = queue.enqueue(at(TENANT, DOCTOR, AT)).block();
 
-        ReviewItem done = queue.review(TENANT, item.record().id(), REVIEWER, ReviewItem.Outcome.NOT_JUSTIFIED, "Not the doctors patient").block();
+        ReviewItem done = queue.review(TENANT, item.record().id(), REVIEWER, ReviewItem.Outcome.NOT_JUSTIFIED, "Not the agents custient").block();
 
         assertTrue(done.escalated());
         assertEquals(List.of(done), queue.escalated(TENANT).collectList().block());
@@ -211,7 +211,7 @@ class ReviewQueueTest {
     void theItemNeverPrintsTheJustificationOrTheNote() {
         ReviewItem item = queue.enqueue(at(TENANT, DOCTOR, AT)).block();
         ReviewItem done = queue.review(TENANT, item.record().id(), REVIEWER, ReviewItem.Outcome.NOT_JUSTIFIED,
-                "patient has diabetes and was not under this doctor").block();
+                "customer has a loan and was not in this agent's branch").block();
 
         assertFalse(done.toString().contains("diabetes") || done.toString().contains("Unconscious"));
     }

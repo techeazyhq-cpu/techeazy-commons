@@ -32,7 +32,7 @@ import reactor.core.publisher.Mono;
  *   <li><b>Any failure of the adapter is {@code UNAVAILABLE}</b>: an exception, an error signal, an empty answer, a
  *       {@code null}, a call that does not answer within the timeout. Nothing that goes wrong can become an allow.</li>
  *   <li><b>No fallback and no grace.</b> The enforcer keeps no cache and assumes nothing. This holds for every purpose, and
- *       so for health data and children's purposes, which the design says fail closed (the Consent Manager's local
+ *       so for sensitive data and children's purposes, which the design says fail closed (the Consent Manager's local
  *       sidecar may allow a bounded offline grace for other purposes, never for these; here there is none at all, and any
  *       grace added later must not apply to them).</li>
  *   <li><b>The retry interval is bounded</b>, so an adapter cannot ask a caller to wait forever or to hammer it.</li>

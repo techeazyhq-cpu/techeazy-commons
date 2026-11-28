@@ -32,10 +32,10 @@ import org.junit.jupiter.api.Test;
 class BreakGlassRecordTest {
 
     static final Instant AT = Instant.parse("2026-11-27T10:00:00Z");
-    static final String SECRET = "Patient collapsed in the corridor with chest pain and a history of heart failure";
+    static final String SECRET = "Customer locked out mid-transfer and the account showed a fraud flag and a pending loan";
 
     static BreakGlassRecord record(UUID tenant, UUID accessor) {
-        return new BreakGlassRecord(UUID.randomUUID(), tenant, UUID.randomUUID(), accessor, "patient-77", "encounter", "read",
+        return new BreakGlassRecord(UUID.randomUUID(), tenant, UUID.randomUUID(), accessor, "subject-77", "account", "read",
                 "life_threatening_emergency", SECRET, AT, "corr-1");
     }
 
@@ -43,11 +43,11 @@ class BreakGlassRecordTest {
     void aReasonIsACodeFromTheProductsListNeverText() {
         for (String bad : new String[] {null, "", "Chest pain", "UNCONSCIOUS_PATIENT", "has space", "1abc", "a".repeat(65)}) {
             assertThrows(IllegalArgumentException.class, () -> new BreakGlassRecord(UUID.randomUUID(), UUID.randomUUID(),
-                    UUID.randomUUID(), UUID.randomUUID(), "patient-77", "encounter", "read", bad, SECRET, AT, "corr-1"),
+                    UUID.randomUUID(), UUID.randomUUID(), "subject-77", "account", "read", bad, SECRET, AT, "corr-1"),
                     "accepted: " + bad);
         }
         assertEquals("other_emergency", new BreakGlassRecord(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                UUID.randomUUID(), "patient-77", "encounter", "read", "other_emergency", SECRET, AT, "corr-1").reason());
+                UUID.randomUUID(), "subject-77", "account", "read", "other_emergency", SECRET, AT, "corr-1").reason());
     }
 
     @Test
@@ -63,18 +63,18 @@ class BreakGlassRecordTest {
         UUID t = UUID.randomUUID();
         for (String bad : new String[] {null, "", "   ", "short", "x".repeat(501), "         x"}) {
             assertThrows(IllegalArgumentException.class, () -> new BreakGlassRecord(UUID.randomUUID(), t, UUID.randomUUID(),
-                    UUID.randomUUID(), "patient-77", "encounter", "read", "other_emergency", bad, AT, "corr-1"),
+                    UUID.randomUUID(), "subject-77", "account", "read", "other_emergency", bad, AT, "corr-1"),
                     "accepted: " + bad);
         }
-        assertEquals(500, new BreakGlassRecord(UUID.randomUUID(), t, UUID.randomUUID(), UUID.randomUUID(), "patient-77",
-                "encounter", "read", "other_emergency", "x".repeat(500), AT, "corr-1").justification().length());
+        assertEquals(500, new BreakGlassRecord(UUID.randomUUID(), t, UUID.randomUUID(), UUID.randomUUID(), "subject-77",
+                "account", "read", "other_emergency", "x".repeat(500), AT, "corr-1").justification().length());
     }
 
     @Test
     void referencesAreOpaqueNeverAValueOrASentence() {
         for (String bad : new String[] {null, "", "Asha Rao", "has space", "a".repeat(129)}) {
             assertThrows(IllegalArgumentException.class, () -> new BreakGlassRecord(UUID.randomUUID(), UUID.randomUUID(),
-                    UUID.randomUUID(), UUID.randomUUID(), bad, "encounter", "read", "other_emergency", SECRET,
+                    UUID.randomUUID(), UUID.randomUUID(), bad, "account", "read", "other_emergency", SECRET,
                     AT, "corr-1"));
         }
     }
@@ -83,8 +83,8 @@ class BreakGlassRecordTest {
     void theJustificationNeverLeavesTheRecordByToStringOrByTheEvent() {
         BreakGlassRecord r = record(UUID.randomUUID(), UUID.randomUUID());
 
-        assertFalse(r.toString().contains("collapsed") || r.toString().contains("heart"));
-        assertFalse(r.toEvent().toString().contains("collapsed") || r.toEvent().toString().contains("heart"));
+        assertFalse(r.toString().contains("locked out") || r.toString().contains("loan"));
+        assertFalse(r.toEvent().toString().contains("locked out") || r.toEvent().toString().contains("loan"));
         assertTrue(Arrays.stream(BreakGlassRecord.Event.class.getRecordComponents())
                 .noneMatch(c -> c.getName().toLowerCase().contains("justification")), "the event has no justification field");
     }
@@ -96,8 +96,17 @@ class BreakGlassRecordTest {
 
         assertEquals(r.id(), e.id());
         assertEquals(r.accessorUserId(), e.accessorUserId());
-        assertEquals("patient-77", e.patientRef());
+        assertEquals("subject-77", e.subjectRef());
         assertEquals("life_threatening_emergency", e.reason());
         assertEquals(r.reviewDueAt(), e.reviewDueAt());
+    }
+
+    @Test
+    void aProductWithNoUnitsOfTheOrganisationLeavesTheScopeOut() {
+        BreakGlassRecord r = new BreakGlassRecord(UUID.randomUUID(), UUID.randomUUID(), null, UUID.randomUUID(), "subject-77",
+                "account", "read", "other_emergency", SECRET, AT, "corr-1");
+
+        assertEquals(null, r.scopeId());
+        assertEquals(null, r.toEvent().scopeId());
     }
 }

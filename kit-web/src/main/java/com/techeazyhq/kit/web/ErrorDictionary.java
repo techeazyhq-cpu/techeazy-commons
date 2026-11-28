@@ -45,8 +45,8 @@ import org.slf4j.LoggerFactory;
  * type. Every service answers problems from it ({@link Problems}), so the same code always carries the same title and
  * status, whichever service raises it.
  *
- * <p>The product file names its product ({@code "product": "ogh"}); that name makes the problem type URN
- * ({@code urn:ogh:problem:quota-exceeded}) and the FHIR coding system ({@code urn:ogh:errors}). Two different product
+ * <p>The product file names its product ({@code "product": "acme"}); that name makes the problem type URN
+ * ({@code urn:acme:problem:quota-exceeded}) and the FHIR coding system ({@code urn:acme:errors}). Two different product
  * names, or a code listed twice, stop the service at start-up.
  *
  * <p>{@code tools/error-dictionary} in this repository checks a product's source against its dictionary in CI. At
@@ -133,17 +133,17 @@ public final class ErrorDictionary {
         return new ErrorDictionary(Collections.unmodifiableMap(entries), product == null ? DEFAULT_PRODUCT : product);
     }
 
-    /** The product's short name, for example {@code ogh}. */
+    /** The product's short name, for example {@code acme}. */
     public String product() {
         return product;
     }
 
-    /** The start of every problem type for this product, for example {@code urn:ogh:problem:}. */
+    /** The start of every problem type for this product, for example {@code urn:acme:problem:}. */
     public String urnPrefix() {
         return "urn:" + product + ":problem:";
     }
 
-    /** The FHIR coding system for this product's error codes, for example {@code urn:ogh:errors}. */
+    /** The FHIR coding system for this product's error codes, for example {@code urn:acme:errors}. */
     public String errorSystem() {
         return "urn:" + product + ":errors";
     }

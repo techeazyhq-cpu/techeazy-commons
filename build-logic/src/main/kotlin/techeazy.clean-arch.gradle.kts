@@ -16,7 +16,7 @@
  * @author Vasantha Kumar <vasantha.kumar@hotmail.com>
  */
 
-// Convention plugin applied to every "-boot" module: pulls in ogh-test-kit's shared
+// Convention plugin applied to every "-boot" module: pulls in kit-test's shared
 // ArchUnit base test so each service enforces the Clean Architecture dependency rule
 // (Domain -> nothing internal, Application -> Domain, Infra/If-Rest -> App+Domain, never
 // Infra <-> If-Rest) as a normal `./gradlew test` failure, not a manual review step.

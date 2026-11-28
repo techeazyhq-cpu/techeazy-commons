@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
  *   <li>{@link Allow}: process. Carries the {@link Basis} it rests on, which the caller must audit.</li>
  *   <li>{@link Deny}: do not process. Carries a short reason code (never a person's data).</li>
  *   <li>{@link Unavailable}: the answer could not be had. It is <b>not a decision</b>: neither allow nor deny. Do not
- *       process, do not ask the person again, retry after the interval. Health and children's purposes fail closed.</li>
+ *       process, do not ask the person again, retry after the interval. Sensitive and children's purposes fail closed.</li>
  * </ul>
  */
 public sealed interface ConsentDecision {

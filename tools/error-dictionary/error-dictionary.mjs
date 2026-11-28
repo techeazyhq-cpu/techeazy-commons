@@ -32,8 +32,8 @@
  *   node error-dictionary.mjs --config error-dictionary.config.json --freeze   # record the released codes as the baseline
  *
  * Config (paths relative to the config file's folder):
- *   { "product": "ogh", "dictionaries": ["..."], "sourceRoots": ["backend"], "services": ["ogh-ref-svc"],
- *     "logPrefix": "OGH", "docOutput": "docs/errors/error-dictionary.md", "baseline": "docs/errors/released-codes.json" }
+ *   { "product": "acme", "dictionaries": ["..."], "sourceRoots": ["backend"], "services": ["acme-ref-svc"],
+ *     "logPrefix": "ACME", "docOutput": "docs/errors/error-dictionary.md", "baseline": "docs/errors/released-codes.json" }
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -209,7 +209,7 @@ export function render(entries, config) {
   out.push(`- FHIR endpoints answer an \`OperationOutcome\`: \`issue.code\` is the FHIR type below, \`issue.details.coding\` is \`urn:${config.product}:errors\` plus the code.`, '');
   out.push('## Rules', '', '- Codes are lower-case words joined by hyphens and never change once released. One code has one status.',
     `- Operational log codes are \`TZ-\` (shared) or \`${config.logPrefix}-\` and upper-case words, in square brackets at the start of a message.`,
-    '- No personal or clinical data in any title, detail or log code.', '');
+    '- No personal or sensitive data in any title, detail or log code.', '');
   out.push('## API problems', '');
   for (const cat of CATEGORIES.filter((c) => problems.some((e) => e.category === c))) {
     out.push(`### ${heading(cat)}`, '', '| Code | Status | Title | What it means | What to do | Retry | FHIR | Raised by |', '|---|---|---|---|---|---|---|---|');
