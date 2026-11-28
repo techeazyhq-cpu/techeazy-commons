@@ -33,6 +33,7 @@ dependencies {
     testImplementation("org.springframework:spring-r2dbc:7.0.10")
     testImplementation("org.springframework:spring-tx:7.0.10")
     testImplementation("org.postgresql:r2dbc-postgresql:1.1.3.RELEASE")
+    testImplementation("io.r2dbc:r2dbc-pool:1.0.2.RELEASE")
     testImplementation("org.postgresql:postgresql:42.7.14")
     testImplementation(platform("org.junit:junit-bom:5.14.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
