@@ -75,7 +75,7 @@ public class FallbackProblemWebExceptionHandler implements WebExceptionHandler {
             return routingProblem(exchange, rse);
         }
         if (tooLarge(ex)) {
-            return write(exchange, HttpStatus.PAYLOAD_TOO_LARGE, Problems.body("payload-too-large", 413,
+            return write(exchange, HttpStatus.valueOf(413), Problems.body("payload-too-large", 413,
                     "The request body is larger than this service accepts.", Problems.correlationId(exchange)));
         }
         if (isNotOurs(ex)) {

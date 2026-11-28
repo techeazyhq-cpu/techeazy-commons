@@ -119,7 +119,7 @@ class ProblemHandlersTest {
 
             new FallbackProblemWebExceptionHandler(JSON).handle(exchange, limit).block();
 
-            assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, exchange.getResponse().getStatusCode());
+            assertEquals(413, exchange.getResponse().getStatusCode().value());
             Map<String, Object> problem = body(exchange);
             assertEquals("payload-too-large", problem.get("code"));
             assertFalse(problem.toString().contains("65536"), "the limit is not announced");
