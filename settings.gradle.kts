@@ -33,4 +33,4 @@ dependencyResolutionManagement {
     }
 }
 
-include("kit-dom", "kit-web", "kit-test", "kit-claims", "kit-latency", "kit-synthetic", "kit-consent", "kit-consent-web", "kit-request-context", "kit-breakglass", "kit-access", "kit-access-web", "kit-fieldcrypt", "kit-leakcheck", "kit-cqrs", "kit-cqrs-r2dbc")
+include("kit-dom", "kit-web", "kit-test", "kit-claims", "kit-latency", "kit-synthetic", "kit-consent", "kit-consent-web", "kit-request-context", "kit-breakglass", "kit-access", "kit-access-web", "kit-fieldcrypt", "kit-leakcheck", "kit-cqrs", "kit-cqrs-r2dbc", "kit-saga", "kit-saga-r2dbc")
