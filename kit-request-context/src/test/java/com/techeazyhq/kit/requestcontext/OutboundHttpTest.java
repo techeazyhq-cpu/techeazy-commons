@@ -19,6 +19,7 @@
 package com.techeazyhq.kit.requestcontext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -36,7 +38,10 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-/** What leaves a service: the caller's token, correlation id and purpose go to internal hosts only, and https is the only scheme. */
+/**
+ * What leaves a service: a token exchanged for the internal target, with the correlation id and purpose, to internal hosts only, and
+ * https is the only scheme. The caller's own token never leaves (#613).
+ */
 class OutboundHttpTest {
 
     private static RequestContext caller(String purpose, String correlationId) {
@@ -45,43 +50,61 @@ class OutboundHttpTest {
     }
 
     private static final RequestContext CALLER = caller("CLAIMS_PROCESSING", "corr-9");
+    private static final Map<String, OutboundTarget> INTERNAL = Map.of("accounts.internal", OutboundTarget.of("acct-svc", "read"));
+
+    /** Stands for the identity provider: a token for the target, naming who it is for. */
+    private final AtomicInteger exchanges = new AtomicInteger();
+    private final AtomicReference<OutboundTarget> asked = new AtomicReference<>();
+    private final TokenExchange exchange = (who, target) -> {
+        exchanges.incrementAndGet();
+        asked.set(target);
+        return Mono.just("exchanged-for-" + target.audience() + "-by-" + who.claims().subject());
+    };
 
     private final AtomicReference<ClientRequest> sent = new AtomicReference<>();
 
     private WebClient client() {
-        return OutboundHttp.webClientBuilder(Set.of("accounts.internal"))
+        return client(exchange);
+    }
+
+    private WebClient client(TokenExchange withExchange) {
+        return OutboundHttp.webClientBuilder(OutboundPolicy.defaults(), INTERNAL, withExchange)
                 .exchangeFunction(request -> {
                     sent.set(request);
                     return Mono.just(ClientResponse.create(HttpStatus.OK).build());
                 }).build();
     }
 
-    @Test
-    void aCallToAnInternalHostCarriesTheCallersTokenCorrelationIdAndPurpose() {
-        client().get().uri("https://accounts.internal/api/x").retrieve().toBodilessEntity()
-                .contextWrite(ctx -> ctx.put(RequestContext.KEY, CALLER)).block();
+    private void call(String url, RequestContext context) {
+        client().get().uri(url).retrieve().toBodilessEntity().contextWrite(ctx -> ctx.put(RequestContext.KEY, context)).block();
+    }
 
-        assertEquals("Bearer caller-token", sent.get().headers().getFirst("Authorization"));
+    @Test
+    void aCallToAnInternalHostCarriesATokenExchangedForThatServiceNotTheCallersOwn() {
+        call("https://accounts.internal/api/x", CALLER);
+
+        assertEquals("Bearer exchanged-for-acct-svc-by-u1", sent.get().headers().getFirst("Authorization"));
+        assertEquals("acct-svc", asked.get().audience());
+        assertEquals(Set.of("read"), asked.get().scopes());
+        assertFalse(sent.get().headers().toString().contains("caller-token"), "the caller's own token never leaves");
         assertEquals("corr-9", sent.get().headers().getFirst("X-Correlation-Id"));
         assertEquals("CLAIMS_PROCESSING", sent.get().headers().getFirst("X-Purpose-Of-Use"));
     }
 
     @Test
     void noClaimIsCopiedIntoAHeaderTheDownstreamServiceReadsThemFromTheToken() {
-        client().get().uri("https://accounts.internal/api/x").retrieve().toBodilessEntity()
-                .contextWrite(ctx -> ctx.put(RequestContext.KEY, CALLER)).block();
+        call("https://accounts.internal/api/x", CALLER);
 
         assertEquals(Set.of("Authorization", "X-Correlation-Id", "X-Purpose-Of-Use"), sent.get().headers().headerNames());
     }
 
     @Test
     void aContextWithNoPurposeOrNoCorrelationIdRelaysNothingInventedInTheirPlace() {
-        client().get().uri("https://accounts.internal/api/x").retrieve().toBodilessEntity()
-                .contextWrite(ctx -> ctx.put(RequestContext.KEY, caller(null, null))).block();
+        call("https://accounts.internal/api/x", caller(null, null));
 
         assertNull(sent.get().headers().getFirst("X-Purpose-Of-Use"));
         assertNull(sent.get().headers().getFirst("X-Correlation-Id"));
-        assertEquals("Bearer caller-token", sent.get().headers().getFirst("Authorization"));
+        assertEquals("Bearer exchanged-for-acct-svc-by-u1", sent.get().headers().getFirst("Authorization"));
     }
 
     @Test
@@ -89,17 +112,17 @@ class OutboundHttpTest {
         client().get().uri("https://accounts.internal/api/x").header("Authorization", "Bearer forged").retrieve()
                 .toBodilessEntity().contextWrite(ctx -> ctx.put(RequestContext.KEY, CALLER)).block();
 
-        assertEquals(List.of("Bearer caller-token"), sent.get().headers().get("Authorization"));
+        assertEquals(List.of("Bearer exchanged-for-acct-svc-by-u1"), sent.get().headers().get("Authorization"));
     }
 
     @Test
-    void aCallToAnyOtherHostNeverCarriesTheCallersToken() {
-        client().get().uri("https://llm-provider.example/v1/x").retrieve().toBodilessEntity()
-                .contextWrite(ctx -> ctx.put(RequestContext.KEY, CALLER)).block();
+    void aCallToAnyOtherHostNeverCarriesAnythingOfTheCallerAndNeverCallsTheIdentityProvider() {
+        call("https://llm-provider.example/v1/x", CALLER);
 
         assertNull(sent.get().headers().getFirst("Authorization"));
         assertNull(sent.get().headers().getFirst("X-Correlation-Id"));
         assertNull(sent.get().headers().getFirst("X-Purpose-Of-Use"));
+        assertEquals(0, exchanges.get());
     }
 
     @Test
@@ -109,6 +132,16 @@ class OutboundHttpTest {
 
         assertTrue(failure.getMessage().contains("without a request context"), failure.getMessage());
         assertNull(sent.get(), "nothing was sent");
+        assertEquals(0, exchanges.get());
+    }
+
+    @Test
+    void whenTheTokenCannotBeExchangedTheCallIsNotMadeAndTheCallersTokenIsNeverSentInstead() {
+        WebClient failing = client((who, target) -> Mono.error(new TokenExchangeException("refused", null)));
+
+        assertThrows(TokenExchangeException.class, () -> failing.get().uri("https://accounts.internal/api/x").retrieve().toBodilessEntity()
+                .contextWrite(ctx -> ctx.put(RequestContext.KEY, CALLER)).block());
+        assertNull(sent.get(), "no call, and no fallback to the caller's own token");
     }
 
     @Test
@@ -116,6 +149,7 @@ class OutboundHttpTest {
         assertThrows(IllegalArgumentException.class, () -> client().get().uri("http://accounts.internal/api/x").retrieve()
                 .toBodilessEntity().contextWrite(ctx -> ctx.put(RequestContext.KEY, CALLER)).block());
         assertNull(sent.get());
+        assertEquals(0, exchanges.get());
     }
 
     @Test
@@ -132,17 +166,30 @@ class OutboundHttpTest {
     }
 
     @Test
-    void theInternalHostsAreCopiedSoALaterChangeToTheCallersSetChangesNothing() {
-        java.util.Set<String> hosts = new java.util.HashSet<>(Set.of("accounts.internal"));
-        WebClient webClient = OutboundHttp.webClientBuilder(hosts).exchangeFunction(request -> {
+    void internalServicesNeedATokenExchangeThereIsNoWayToRelayTheWholeToken() {
+        assertThrows(IllegalArgumentException.class, () -> OutboundHttp.webClientBuilder(OutboundPolicy.defaults(), INTERNAL, null));
+        assertThrows(IllegalArgumentException.class, () -> OutboundHttp.relay(INTERNAL, null));
+    }
+
+    @Test
+    void theInternalTargetsAreCopiedSoALaterChangeToTheCallersMapChangesNothing() {
+        java.util.Map<String, OutboundTarget> targets = new java.util.HashMap<>(INTERNAL);
+        WebClient webClient = OutboundHttp.webClientBuilder(OutboundPolicy.defaults(), targets, exchange).exchangeFunction(request -> {
             sent.set(request);
             return Mono.just(ClientResponse.create(HttpStatus.OK).build());
         }).build();
-        hosts.add("llm-provider.example");
+        targets.put("llm-provider.example", OutboundTarget.of("anyone"));
 
         webClient.get().uri("https://llm-provider.example/v1/x").retrieve().toBodilessEntity()
                 .contextWrite(ctx -> ctx.put(RequestContext.KEY, CALLER)).block();
 
         assertNull(sent.get().headers().getFirst("Authorization"));
+    }
+
+    @Test
+    void theHostIsMatchedWithoutRegardToCase() {
+        call("https://ACCOUNTS.internal/api/x", CALLER);
+
+        assertEquals("Bearer exchanged-for-acct-svc-by-u1", sent.get().headers().getFirst("Authorization"));
     }
 }
