@@ -216,6 +216,9 @@ public final class SagaEngine {
         if (saga.phase() == SagaPhase.COMPENSATING) {
             return escalate(saga, definition, code, now);
         }
+        if (definition.forwardOnly()) {
+            return escalate(saga, definition, code, now);
+        }
         return startCompensation(saga, definition, code, saga.stepIndex() - 1, now);
     }
 
@@ -230,7 +233,7 @@ public final class SagaEngine {
                 d.lastError = code;
             }));
         }
-        if (saga.phase() == SagaPhase.COMPENSATING) {
+        if (saga.phase() == SagaPhase.COMPENSATING || definition.forwardOnly()) {
             return escalate(saga, definition, code, now);
         }
         // out of attempts: the step may have taken effect without our knowing, so its own compensation runs too
@@ -298,19 +301,39 @@ public final class SagaEngine {
             if (saga.status() != SagaStatus.NEEDS_INTERVENTION) {
                 return Mono.just(false);
             }
+            SagaDefinition definition = definitions.get(saga.type());
+            boolean forwardOnly = definition != null && definition.forwardOnly();
             Instant now = clock.instant();
-            SagaInstance next = resolution == ManualResolution.RETRY
-                    ? saga.change(now, d -> {
-                        d.status = SagaStatus.RUNNING;
-                        d.attempt = 0;
-                        d.inFlight = false;
-                        d.nextAttemptAt = now;
-                    })
-                    : saga.change(now, d -> {
+            SagaInstance next;
+            switch (resolution) {
+                case RETRY -> next = saga.change(now, d -> {
+                    d.status = SagaStatus.RUNNING;
+                    d.attempt = 0;
+                    d.inFlight = false;
+                    d.nextAttemptAt = now;
+                });
+                case MARK_COMPENSATED -> {
+                    if (saga.phase() != SagaPhase.COMPENSATING) {
+                        return Mono.just(false);
+                    }
+                    next = saga.change(now, d -> {
                         d.status = SagaStatus.COMPENSATED;
                         d.inFlight = false;
                         d.lastError = "resolved-by-hand";
                     });
+                }
+                case MARK_COMPLETED -> {
+                    if (!forwardOnly || saga.phase() != SagaPhase.FORWARD) {
+                        return Mono.just(false);
+                    }
+                    next = saga.change(now, d -> {
+                        d.status = SagaStatus.COMPLETED;
+                        d.inFlight = false;
+                        d.lastError = "resolved-by-hand";
+                    });
+                }
+                default -> throw new IllegalStateException();
+            }
             return persist(saga, next).map(moved -> true).defaultIfEmpty(false);
         }).defaultIfEmpty(false);
     }

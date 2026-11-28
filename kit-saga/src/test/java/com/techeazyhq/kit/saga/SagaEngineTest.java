@@ -419,6 +419,85 @@ class SagaEngineTest {
         assertTrue(changes.size() >= 4, "start and every step");
     }
 
+    // ---- a saga that must complete ---------------------------------------------------------------------------------------------
+
+    private SagaDefinition mustComplete(StepBehaviour second, int attempts) {
+        return SagaDefinition.builder("consent-withdrawal", "privacy_ops").forwardOnly()
+                .step(step("notify-clinical", OK, null, attempts))
+                .step(step("notify-ai-gateway", second, null, attempts))
+                .step(step("notify-analytics", OK, null, attempts)).build();
+    }
+
+    private SagaInstance startConsent(SagaEngine engine) {
+        return engine.start("consent-withdrawal", TENANT, "corr-2", Map.of("subject", "ref-1")).block();
+    }
+
+    @Test
+    void aForwardOnlySagaThatCannotFinishAStepGoesToTheManualQueueAtThatStepAndUndoesNothing() {
+        SagaEngine engine = engine(mustComplete(ctx -> Mono.error(new IllegalStateException("gateway down")), 2));
+        SagaInstance saga = startConsent(engine);
+
+        SagaInstance stuck = drive(engine, saga.id());
+
+        assertEquals(SagaStatus.NEEDS_INTERVENTION, stuck.status());
+        assertEquals(SagaPhase.FORWARD, stuck.phase());
+        assertEquals(1, stuck.stepIndex(), "stopped at the step that could not be done");
+        assertEquals("privacy_ops", stuck.owner());
+        assertEquals(List.of("notify-clinical:do#1", "notify-ai-gateway:do#1", "notify-ai-gateway:do#2"), calls);
+    }
+
+    @Test
+    void aDefinitiveRefusalInAForwardOnlySagaAlsoGoesToTheManualQueue() {
+        SagaEngine engine = engine(mustComplete(ctx -> Mono.just(StepOutcome.failed("subject-unknown")), 3));
+
+        SagaInstance stuck = drive(engine, startConsent(engine).id());
+
+        assertEquals(SagaStatus.NEEDS_INTERVENTION, stuck.status());
+        assertEquals("subject-unknown", stuck.lastError());
+    }
+
+    @Test
+    void theTeamFixesTheCauseRetriesAndTheForwardOnlySagaCompletesFromWhereItStopped() {
+        AtomicInteger tries = new AtomicInteger();
+        StepBehaviour gateway = ctx -> tries.incrementAndGet() <= 2 ? Mono.error(new IllegalStateException("down")) : OK.run(ctx);
+        SagaEngine engine = engine(mustComplete(gateway, 2));
+        SagaInstance saga = startConsent(engine);
+        assertEquals(SagaStatus.NEEDS_INTERVENTION, drive(engine, saga.id()).status());
+
+        assertTrue(engine.resolve(saga.id(), ManualResolution.RETRY, "privacy-lead-1").block());
+
+        assertEquals(SagaStatus.COMPLETED, drive(engine, saga.id()).status());
+        assertEquals(1, calls.stream().filter(c -> c.startsWith("notify-clinical")).count(), "finished steps are not repeated");
+        assertEquals(1, calls.stream().filter(c -> c.startsWith("notify-analytics")).count());
+    }
+
+    @Test
+    void theTeamCanMarkAForwardOnlySagaCompletedByHandButNeverCompensated() {
+        SagaEngine engine = engine(mustComplete(ctx -> Mono.error(new IllegalStateException("down")), 1));
+        SagaInstance saga = startConsent(engine);
+        drive(engine, saga.id());
+
+        assertFalse(engine.resolve(saga.id(), ManualResolution.MARK_COMPENSATED, "privacy-lead-1").block());
+        assertTrue(engine.resolve(saga.id(), ManualResolution.MARK_COMPLETED, "privacy-lead-1").block());
+        assertEquals(SagaStatus.COMPLETED, store.find(saga.id()).block().status());
+    }
+
+    @Test
+    void markCompletedIsNotAllowedForASagaThatCanBeUndone() {
+        SagaEngine engine = engine(saga(OK, ctx -> Mono.error(new IllegalStateException("x")),
+                ctx -> Mono.just(StepOutcome.failed("no")), OK, 1));
+        SagaInstance saga = start(engine);
+        drive(engine, saga.id());
+
+        assertFalse(engine.resolve(saga.id(), ManualResolution.MARK_COMPLETED, "ops-lead-1").block());
+    }
+
+    @Test
+    void aForwardOnlySagaHasNothingToUndo() {
+        assertThrows(IllegalArgumentException.class, () -> SagaDefinition.builder("x", "ops").forwardOnly()
+                .step(step("a", OK, OK, 1)).step(step("b", OK, null, 1)).build());
+    }
+
     // ---- what is allowed ------------------------------------------------------------------------------------------------------
 
     @Test

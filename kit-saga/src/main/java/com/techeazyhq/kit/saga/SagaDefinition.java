@@ -36,11 +36,13 @@ public final class SagaDefinition {
     private final String type;
     private final String owner;
     private final List<Step> steps;
+    private final boolean forwardOnly;
 
-    private SagaDefinition(String type, String owner, List<Step> steps) {
+    private SagaDefinition(String type, String owner, List<Step> steps, boolean forwardOnly) {
         this.type = type;
         this.owner = owner;
         this.steps = List.copyOf(steps);
+        this.forwardOnly = forwardOnly;
     }
 
     public String type() {
@@ -56,6 +58,15 @@ public final class SagaDefinition {
         return steps;
     }
 
+    /**
+     * True for a saga that must <b>complete</b> and has nothing to undo (propagating a consent withdrawal, erasing data): when a
+     * step cannot be done after its retries the saga goes to the manual queue at that step instead of being "compensated", and
+     * the team either fixes the cause and retries, or marks it completed by hand.
+     */
+    public boolean forwardOnly() {
+        return forwardOnly;
+    }
+
     public static Builder builder(String type, String owner) {
         return new Builder(type, owner);
     }
@@ -67,6 +78,7 @@ public final class SagaDefinition {
         private final String type;
         private final String owner;
         private final List<Step> steps = new ArrayList<>();
+        private boolean forwardOnly;
 
         private Builder(String type, String owner) {
             if (type == null || !type.matches("[a-z][a-z0-9-]{0,63}")) {
@@ -99,6 +111,12 @@ public final class SagaDefinition {
             return this;
         }
 
+        /** The saga must complete and has nothing to undo: see {@link SagaDefinition#forwardOnly()}. No step may have a compensation. */
+        public Builder forwardOnly() {
+            this.forwardOnly = true;
+            return this;
+        }
+
         public SagaDefinition build() {
             if (steps.size() < 2) {
                 throw new IllegalArgumentException("a saga spans at least two steps; one service's operation is a transaction");
@@ -109,7 +127,10 @@ public final class SagaDefinition {
                     throw new IllegalArgumentException("two steps are called " + step.name());
                 }
             }
-            return new SagaDefinition(type, owner, steps);
+            if (forwardOnly && steps.stream().anyMatch(Step::hasCompensation)) {
+                throw new IllegalArgumentException("a forward-only saga has nothing to undo: no step may have a compensation");
+            }
+            return new SagaDefinition(type, owner, steps, forwardOnly);
         }
     }
 }
