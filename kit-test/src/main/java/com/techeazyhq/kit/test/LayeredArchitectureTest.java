@@ -40,6 +40,29 @@ public abstract class LayeredArchitectureTest {
 
     protected abstract String basePackage();
 
+    /**
+     * The access guard the application and interface layers must use before they reach a port marked {@code @GuardedData}: the class
+     * name of the port the service defines for it (in the application layer). Null for a service that marks nothing.
+     */
+    protected String accessGuardType() {
+        return null;
+    }
+
+    /** The consent guard, required in addition for ports marked D3 or D4. Null for a service with none. */
+    protected String consentGuardType() {
+        return null;
+    }
+
+    @Test
+    void noHandlerReachesGuardedDataWithoutTheGuards() {
+        JavaClasses importedClasses = new ClassFileImporter().importPackages(basePackage());
+
+        java.util.List<String> violations = GuardedDataRule.violations(importedClasses, basePackage(), accessGuardType(), consentGuardType());
+
+        org.junit.jupiter.api.Assertions.assertTrue(violations.isEmpty(), "Guarded data is reached without its guards:\n  "
+                + String.join("\n  ", violations));
+    }
+
     @Test
     void respectsCleanArchitectureLayering() {
         JavaClasses importedClasses = new ClassFileImporter().importPackages(basePackage());
