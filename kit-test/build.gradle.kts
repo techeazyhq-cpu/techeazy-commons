@@ -29,3 +29,9 @@ dependencies {
     api(platform("org.junit:junit-bom:5.14.4"))
     api("org.junit.jupiter:junit-jupiter")
 }
+
+// The rule is tested against fixture classes that carry the real annotation.
+dependencies {
+    testImplementation(project(":kit-dom"))
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
