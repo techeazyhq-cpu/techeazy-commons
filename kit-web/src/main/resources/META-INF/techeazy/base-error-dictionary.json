@@ -303,6 +303,36 @@
       "since": "0.1.0"
     },
     {
+      "code": "payload-too-large",
+      "kind": "problem",
+      "status": 413,
+      "category": "validation",
+      "title": "Request too large",
+      "description": "The body of the request is larger than the service accepts.",
+      "action": "Send a smaller body, or split the work into several requests.",
+      "retryable": false,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "too-long",
+      "since": "0.1.0"
+    },
+    {
+      "code": "request-timeout",
+      "kind": "problem",
+      "status": 503,
+      "category": "dependency",
+      "title": "The request took too long",
+      "description": "The service did not finish the request within the time it allows. Nothing is promised about whether the work was done.",
+      "action": "Wait for the time in the Retry-After header and try again; check the result before repeating a change.",
+      "retryable": true,
+      "raisedBy": [
+        "platform"
+      ],
+      "fhirIssueType": "timeout",
+      "since": "0.1.0"
+    },
+    {
       "code": "internal-error",
       "kind": "problem",
       "status": 500,
