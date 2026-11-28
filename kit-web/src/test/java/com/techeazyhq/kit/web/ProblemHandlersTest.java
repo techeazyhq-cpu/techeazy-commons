@@ -110,6 +110,22 @@ class ProblemHandlersTest {
         assertFalse(problem.get("detail").toString().contains("Unexpected character"), "nothing of the parser's message");
     }
 
+    @Test
+    void aBodyOverTheCodecLimitIs413PayloadTooLargeHoweverDeepTheExceptionIsWrapped() throws Exception {
+        for (Throwable limit : new Throwable[] {new org.springframework.core.io.buffer.DataBufferLimitException("Exceeded limit on max bytes"),
+                new ServerWebInputException("Failed to read HTTP message", null,
+                        new org.springframework.core.io.buffer.DataBufferLimitException("Exceeded limit on max bytes to buffer : 65536"))}) {
+            MockServerWebExchange exchange = exchange();
+
+            new FallbackProblemWebExceptionHandler(JSON).handle(exchange, limit).block();
+
+            assertEquals(413, exchange.getResponse().getStatusCode().value());
+            Map<String, Object> problem = body(exchange);
+            assertEquals("payload-too-large", problem.get("code"));
+            assertFalse(problem.toString().contains("65536"), "the limit is not announced");
+        }
+    }
+
     /** Stands for a database driver's exception: public, with a SQLSTATE, like R2dbcException. */
     public static class DriverException extends RuntimeException {
         private final String sqlState;
