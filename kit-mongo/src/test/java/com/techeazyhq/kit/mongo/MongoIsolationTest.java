@@ -189,6 +189,18 @@ class MongoIsolationTest {
     }
 
     @Test
+    void maintenanceSeesEveryDocumentOfOneTenantBeyondTheServingLimitAndTheTenantsPresent() {
+        for (int i = 0; i < 1100; i++) {
+            insertFor(A, "i-" + i, "n");
+        }
+        insertFor(B, "b-1", "b");
+
+        assertEquals(1100L, docs.findAll(A).count().block(), "no limit, unlike find");
+        assertEquals(1L, docs.findAll(B).count().block(), "and only that tenant's");
+        assertEquals(java.util.Set.of(A.toString(), B.toString()), new java.util.HashSet<>(docs.tenants().collectList().block()));
+    }
+
+    @Test
     void aDatabasePerTenantIsATierOfItsOwnAndStillChecksTheTenant() {
         TenantDatabases databases = new TenantDatabases(client, "ogh_t");
         TenantDocuments a = databases.documents(A, "items");

@@ -81,6 +81,20 @@ public final class TenantDocuments {
         });
     }
 
+    /**
+     * Every document of one tenant, with no limit and in no particular order: for maintenance that must see the whole of it
+     * (reconciling a read model with its source, an export), never for serving a screen.
+     */
+    public Flux<Document> findAll(UUID tenant) {
+        Bson filter = tenantFilter(tenant);
+        return Flux.defer(() -> Flux.from(collection.find(filter)));
+    }
+
+    /** The tenants that have at least one document, for maintenance that goes tenant by tenant. */
+    public Flux<String> tenants() {
+        return Flux.defer(() -> Flux.from(collection.distinct(TENANT, String.class)));
+    }
+
     public Mono<Long> count(UUID tenant, Bson filter) {
         Bson scoped = scoped(tenant, filter);
         return Mono.defer(() -> Mono.from(collection.countDocuments(scoped)));
