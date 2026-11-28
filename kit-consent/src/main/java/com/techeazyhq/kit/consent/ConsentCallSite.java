@@ -21,7 +21,7 @@ package com.techeazyhq.kit.consent;
 import java.time.Duration;
 
 /**
- * A place in a product where the Consent Port is asked (reading clinical data, sending a notification, sharing with another
+ * A place in a product where the Consent Port is asked (reading a sensitive record, sending a notification, sharing with another
  * tenant, giving an AI model context, and so on). The product names its sites, usually as an enum that implements this, and
  * says for each which purposes it may be used for and how long it waits for the answer. {@link ConsentGuard} enforces both.
  *

@@ -21,7 +21,7 @@ package com.techeazyhq.kit.consent;
 import java.util.regex.Pattern;
 
 /**
- * Why data is processed, as a code ({@code CARE_DELIVERY}), never as text. A product's catalogue of codes is its own;
+ * Why data is processed, as a code ({@code ORDER_FULFILMENT}), never as text. A product's catalogue of codes is its own;
  * the port only insists on the shape, so a purpose cannot carry free text.
  */
 public record PurposeCode(String value) {

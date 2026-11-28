@@ -65,13 +65,17 @@ class RequestContextWebFilterTest {
             })
             .then();
 
+    /** A bank product's names: it reads a person's branches and agent id as attributes. */
+    private static final ClaimNames BANK = ClaimNames.defaults().withAttribute("branch_ids", "branch_ids")
+            .withAttribute("agent_id", "agent_id");
+
     private static Map<String, Object> doctor() {
         Map<String, Object> c = new LinkedHashMap<>();
-        c.put("sub", "dr-asha");
+        c.put("sub", "asha");
         c.put("tenant_id", TENANT);
-        c.put("facility_ids", List.of("f1", "f2"));
-        c.put("roles", List.of("physician"));
-        c.put("practitioner_id", "p-77");
+        c.put("branch_ids", List.of("b1", "b2"));
+        c.put("roles", List.of("teller"));
+        c.put("agent_id", "a-77");
         return c;
     }
 
@@ -98,15 +102,15 @@ class RequestContextWebFilterTest {
 
     @Test
     void aSignedInCallGetsTheClaimsOfItsVerifiedTokenTheTokenAndTheCorrelationId() {
-        run(new RequestContextWebFilter(), token(doctor()), null);
+        run(new RequestContextWebFilter(BANK), token(doctor()), null);
 
         assertTrue(hadContext.get());
         RequestContext ctx = seen.get();
         assertEquals(UUID.fromString(TENANT), ctx.tenantId());
-        assertEquals("dr-asha", ctx.claims().subject());
-        assertEquals(Set.of("f1", "f2"), ctx.claims().facilityIds());
-        assertEquals(Set.of("physician"), ctx.claims().roles());
-        assertEquals("p-77", ctx.claims().practitionerId());
+        assertEquals("asha", ctx.claims().subject());
+        assertEquals(Set.of("b1", "b2"), ctx.claims().attribute("branch_ids"));
+        assertEquals(Set.of("teller"), ctx.claims().roles());
+        assertEquals("a-77", ctx.claims().attributeValue("agent_id").orElseThrow());
         assertEquals("the.signed.token", ctx.bearerToken());
         assertEquals("corr-1", ctx.correlationId());
         assertNull(ctx.purpose());
@@ -115,7 +119,7 @@ class RequestContextWebFilterTest {
 
     @Test
     void thePurposeTheRequestStatedIsAddedToTheClaims() {
-        run(new RequestContextWebFilter(), token(doctor()), PurposeCode.of("CARE_RECORD"));
+        run(new RequestContextWebFilter(BANK), token(doctor()), PurposeCode.of("CARE_RECORD"));
 
         assertEquals("CARE_RECORD", seen.get().purpose());
         assertEquals("CARE_RECORD", seen.get().claims().purpose());
@@ -127,7 +131,7 @@ class RequestContextWebFilterTest {
         Map<String, Object> claims = doctor();
         claims.remove("tenant_id");
 
-        run(new RequestContextWebFilter(), token(claims), PurposeCode.of("CARE_RECORD"));
+        run(new RequestContextWebFilter(BANK), token(claims), PurposeCode.of("CARE_RECORD"));
 
         assertFalse(hadContext.get());
         assertNull(seen.get());
@@ -135,13 +139,13 @@ class RequestContextWebFilterTest {
 
     @Test
     void aTokenWithAnyClaimNotWellFormedGetsNoContext() {
-        for (Map.Entry<String, Object> bad : Map.<String, Object>of("tenant_id", "tenant-a", "roles", List.of("phys ician"),
-                "facility_ids", List.of("f1\nf2"), "practitioner_id", "p 77", "sub", "has space").entrySet()) {
+        for (Map.Entry<String, Object> bad : Map.<String, Object>of("tenant_id", "tenant-a", "roles", List.of("tel ler"),
+                "branch_ids", List.of("b1\nb2"), "agent_id", "a 77", "sub", "has space").entrySet()) {
             Map<String, Object> claims = doctor();
             claims.put(bad.getKey(), bad.getValue());
             hadContext.set(null);
 
-            run(new RequestContextWebFilter(), token(claims), null);
+            run(new RequestContextWebFilter(BANK), token(claims), null);
 
             assertFalse(hadContext.get(), bad.getKey());
         }
@@ -149,29 +153,29 @@ class RequestContextWebFilterTest {
 
     @Test
     void anAnonymousCallAndOneAuthenticatedAnotherWayGetNoContext() {
-        run(new RequestContextWebFilter(), null, null);
+        run(new RequestContextWebFilter(BANK), null, null);
         assertFalse(hadContext.get());
 
-        run(new RequestContextWebFilter(), new UsernamePasswordAuthenticationToken("someone", "n/a", List.of()), null);
+        run(new RequestContextWebFilter(BANK), new UsernamePasswordAuthenticationToken("someone", "n/a", List.of()), null);
         assertFalse(hadContext.get());
     }
 
     @Test
     void theRequestStillGoesThroughWhenThereIsNoContext() {
         // the filter never refuses: handlers that need a caller fail loudly, others (health probes) are untouched
-        MockServerWebExchange exchange = run(new RequestContextWebFilter(), null, null);
+        MockServerWebExchange exchange = run(new RequestContextWebFilter(BANK), null, null);
 
         assertNull(exchange.getResponse().getStatusCode());
     }
 
     @Test
     void aProductCanNameTheClaimsItsIdentityProviderUses() {
-        ClaimNames names = new ClaimNames("uid", "org", "sites", List.of("groups"), "doc", "reg");
+        ClaimNames names = new ClaimNames("uid", "org", List.of("groups"), Map.of("sites", "sites"));
         Map<String, Object> claims = Map.of("uid", "u1", "org", TENANT, "sites", List.of("s1"), "groups", List.of("g1"));
 
         run(new RequestContextWebFilter(names), token(claims), null);
 
-        assertEquals(Set.of("s1"), seen.get().claims().facilityIds());
+        assertEquals(Set.of("s1"), seen.get().claims().attribute("sites"));
         assertEquals(Set.of("g1"), seen.get().claims().roles());
     }
 

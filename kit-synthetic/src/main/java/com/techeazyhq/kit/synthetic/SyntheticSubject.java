@@ -29,7 +29,7 @@ import java.util.random.RandomGenerator;
  *
  * <p>A synthetic subject id is a UUID whose first 32 bits are {@link #MARKER} ("SYN" and a zero byte), so a leaked
  * one is recognisable in a database, a log or an event: {@code 53594e00-....}. Its reference, where a subject is named
- * as text (the Consent Port, events), is {@link #PREFIX} followed by the id: {@code syn:53594e00-....}. A real patient
+ * as text (the Consent Port, events), is {@link #PREFIX} followed by the id: {@code syn:53594e00-....}. A real person
  * id is a random UUID, so it carries the marker only by a 1 in 4 billion accident; the reference prefix is what a
  * guard checks first, and both checks must pass.
  */

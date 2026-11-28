@@ -27,7 +27,7 @@ import reactor.core.publisher.Mono;
  *
  * <p>Rules every adapter keeps (the shared contract test checks them):
  * <ul>
- *   <li>Ids only: purpose codes and opaque references cross the port, never a clinical value or free text.</li>
+ *   <li>Ids only: purpose codes and opaque references cross the port, never a record value or free text.</li>
  *   <li>A check answers {@link ConsentDecision.Allow}, {@link ConsentDecision.Deny} or {@link ConsentDecision.Unavailable},
  *       and only a call that cannot be understood (a null, a malformed value) is an error. A check never completes empty.</li>
  *   <li>{@code UNAVAILABLE} is never read as allow or deny.</li>

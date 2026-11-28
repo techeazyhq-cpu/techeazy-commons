@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -64,12 +65,16 @@ class ClaimsParserTest {
         return m;
     }
 
+    /** A hospital product's names: it reads a person's facilities, practitioner id and registry id as attributes. */
+    private static final ClaimNames HOSPITAL = ClaimNames.defaults().withAttribute("facility_ids", "facility_ids")
+            .withAttribute("practitioner_id", "practitioner_id").withAttribute("registry_id", "hpr_id");
+
     private static String invalid(Map<String, ?> claims) {
-        return assertInstanceOf(ClaimsParser.Invalid.class, ClaimsParser.parse(claims)).code();
+        return assertInstanceOf(ClaimsParser.Invalid.class, ClaimsParser.parse(claims, HOSPITAL)).code();
     }
 
     private static Claims valid(Map<String, ?> claims) {
-        return assertInstanceOf(ClaimsParser.Valid.class, ClaimsParser.parse(claims)).claims();
+        return assertInstanceOf(ClaimsParser.Valid.class, ClaimsParser.parse(claims, HOSPITAL)).claims();
     }
 
     // ---- what a good token gives -----------------------------------------------------------------------------------------
@@ -80,33 +85,33 @@ class ClaimsParserTest {
 
         assertEquals("user-1", c.subject());
         assertEquals(UUID.fromString(TENANT), c.tenantId());
-        assertEquals(Set.of("f1", "f2"), c.facilityIds());
+        assertEquals(Set.of("f1", "f2"), c.attribute("facility_ids"));
         assertEquals(Set.of("physician", "nurse"), c.roles());
-        assertEquals("p-77", c.practitionerId());
-        assertEquals("hpr@example.in", c.hprId());
+        assertEquals("p-77", c.attributeValue("practitioner_id").orElseThrow());
+        assertEquals("hpr@example.in", c.attributeValue("registry_id").orElseThrow());
         assertNull(c.purpose(), "the purpose is a statement of the request, never in the token");
-        assertTrue(c.hasRole("nurse") && c.worksAt("f2") && c.isPractitioner());
+        assertTrue(c.hasRole("nurse") && c.hasAttribute("facility_ids", "f2"));
+        assertEquals(Optional.empty(), c.attributeValue("facility_ids"), "two values are not one");
     }
 
     @Test
     void aMinimalTokenIsAPersonOfATenantWhoIsAllowedNothingYet() {
         Claims c = valid(Map.of("sub", "user-2", "tenant_id", TENANT));
 
-        assertEquals(Set.of(), c.facilityIds());
+        assertEquals(Set.of(), c.attribute("facility_ids"));
         assertEquals(Set.of(), c.roles());
-        assertNull(c.practitionerId());
-        assertNull(c.hprId());
-        assertFalse(c.isPractitioner());
+        assertEquals(Optional.empty(), c.attributeValue("practitioner_id"));
+        assertEquals(Map.of(), c.attributes());
     }
 
     @Test
-    void aSingleStringIsASetOfOneForFacilitiesAndRoles() {
+    void aSingleStringIsASetOfOneForAnAttributeAndForRoles() {
         Map<String, Object> single = with("roles", "physician");
         single.put("facility_ids", "f9");
         Claims c = valid(single);
 
         assertEquals(Set.of("physician"), c.roles());
-        assertEquals(Set.of("f9"), c.facilityIds());
+        assertEquals(Set.of("f9"), c.attribute("facility_ids"));
     }
 
     @Test
@@ -118,7 +123,8 @@ class ClaimsParserTest {
     void theParsedSetsAreImmutableAndKeepTheirOrder() {
         Claims c = valid(full());
 
-        assertEquals(List.of("f1", "f2"), new ArrayList<>(c.facilityIds()));
+        assertEquals(List.of("f1", "f2"), new ArrayList<>(c.attribute("facility_ids")));
+        assertThrows(UnsupportedOperationException.class, () -> c.attributes().put("x", Set.of()));
         assertThrows(UnsupportedOperationException.class, () -> c.roles().add("admin"));
     }
 
@@ -146,21 +152,21 @@ class ClaimsParserTest {
         }
     }
 
-    // ---- facilities and roles ----------------------------------------------------------------------------------------------
+    // ---- attributes and roles ----------------------------------------------------------------------------------------------
 
     @Test
-    void facilitiesAndRolesMustBePlainTokensOfTheRightType() {
+    void anAttributeAndRolesMustBePlainTokensOfTheRightType() {
         for (Object bad : new Object[] {List.of("ok", "has space"), List.of("ok", 5), List.of("a\nb"), 5, Map.of("a", "b"),
                 List.of(""), List.of(List.of("nested")), "two words"}) {
-            assertEquals("bad-facilities", invalid(with("facility_ids", bad)), String.valueOf(bad));
+            assertEquals("bad-attribute", invalid(with("facility_ids", bad)), String.valueOf(bad));
             assertEquals("bad-roles", invalid(with("roles", bad)), String.valueOf(bad));
         }
     }
 
     @Test
-    void thereAreLimitsOnHowManyFacilitiesAndRolesAToken() {
+    void thereAreLimitsOnHowManyValuesAndRolesAToken() {
         List<String> manyFacilities = new ArrayList<>();
-        for (int i = 0; i <= Claims.MAX_FACILITIES; i++) {
+        for (int i = 0; i <= Claims.MAX_VALUES; i++) {
             manyFacilities.add("f" + i);
         }
         List<String> manyRoles = new ArrayList<>();
@@ -168,9 +174,9 @@ class ClaimsParserTest {
             manyRoles.add("r" + i);
         }
 
-        assertEquals("bad-facilities", invalid(with("facility_ids", manyFacilities)));
+        assertEquals("bad-attribute", invalid(with("facility_ids", manyFacilities)));
         assertEquals("bad-roles", invalid(with("roles", manyRoles)));
-        assertEquals(Claims.MAX_FACILITIES, valid(with("facility_ids", manyFacilities.subList(0, Claims.MAX_FACILITIES))).facilityIds().size());
+        assertEquals(Claims.MAX_VALUES, valid(with("facility_ids", manyFacilities.subList(0, Claims.MAX_VALUES))).attribute("facility_ids").size());
     }
 
     @Test
@@ -179,37 +185,45 @@ class ClaimsParserTest {
         kc.put("realm_access", Map.of("roles", List.of("physician")));
 
         assertEquals(Set.of("physician"), assertInstanceOf(ClaimsParser.Valid.class,
-                ClaimsParser.parse(kc, ClaimNames.defaults().keycloakRealmRoles())).claims().roles());
+                ClaimsParser.parse(kc, HOSPITAL.keycloakRealmRoles())).claims().roles());
         assertEquals(Set.of(), valid(kc).roles(), "with the default names there is no such claim");
         assertEquals("bad-roles", assertInstanceOf(ClaimsParser.Invalid.class, ClaimsParser.parse(
-                with("realm_access", Map.of("roles", "two words")), ClaimNames.defaults().keycloakRealmRoles())).code());
+                with("realm_access", Map.of("roles", "two words")), HOSPITAL.keycloakRealmRoles())).code());
     }
 
     @Test
     void aProductCanNameTheClaimsItsIdentityProviderUses() {
-        ClaimNames names = new ClaimNames("uid", "org", "sites", List.of("groups"), "doc", "reg");
+        ClaimNames names = new ClaimNames("uid", "org", List.of("groups"), Map.of("sites", "sites", "doctor", "doc", "registry", "reg"));
         Map<String, Object> token = Map.of("uid", "u1", "org", TENANT, "sites", List.of("s1"), "groups", List.of("g1"), "doc", "d1",
                 "reg", "r1");
 
         Claims c = assertInstanceOf(ClaimsParser.Valid.class, ClaimsParser.parse(token, names)).claims();
 
         assertEquals("u1", c.subject());
-        assertEquals(Set.of("s1"), c.facilityIds());
+        assertEquals(Set.of("s1"), c.attribute("sites"));
         assertEquals(Set.of("g1"), c.roles());
-        assertEquals("d1", c.practitionerId());
-        assertEquals("r1", c.hprId());
+        assertEquals("d1", c.attributeValue("doctor").orElseThrow());
+        assertEquals("r1", c.attributeValue("registry").orElseThrow());
     }
 
-    // ---- practitioner and the registry placeholder -------------------------------------------------------------------------
+    // ---- single-valued attributes -------------------------------------------------------------------------
 
     @Test
-    void thePractitionerAndTheRegistryIdAreOptionalButMustBePlainTokensWhenPresent() {
-        assertNull(valid(without("practitioner_id")).practitionerId());
-        assertNull(valid(with("hpr_id", null)).hprId());
-        for (Object bad : new Object[] {"", "a b", 3, List.of("p"), "x".repeat(129)}) {
-            assertEquals("bad-practitioner", invalid(with("practitioner_id", bad)), String.valueOf(bad));
-            assertEquals("bad-registry-id", invalid(with("hpr_id", bad)), String.valueOf(bad));
+    void anAttributeIsOptionalButMustBePlainTokensWhenPresent() {
+        assertEquals(Optional.empty(), valid(without("practitioner_id")).attributeValue("practitioner_id"));
+        assertEquals(Optional.empty(), valid(with("hpr_id", null)).attributeValue("registry_id"));
+        for (Object bad : new Object[] {"", "a b", 3, "x".repeat(129)}) {
+            assertEquals("bad-attribute", invalid(with("practitioner_id", bad)), String.valueOf(bad));
+            assertEquals("bad-attribute", invalid(with("hpr_id", bad)), String.valueOf(bad));
         }
+    }
+
+    @Test
+    void aProductThatDeclaresNoAttributesIgnoresEveryClaimItDoesNotKnow() {
+        Claims c = assertInstanceOf(ClaimsParser.Valid.class, ClaimsParser.parse(full())).claims();
+
+        assertEquals(Map.of(), c.attributes());
+        assertEquals(Set.of("physician", "nurse"), c.roles());
     }
 
     // ---- it never throws, and never repeats what it was given ---------------------------------------------------------------
@@ -233,7 +247,7 @@ class ClaimsParserTest {
                     m.put(key, pool[random.nextInt(pool.length)]);
                 }
             }
-            ClaimsParser.Result result = ClaimsParser.parse(m);
+            ClaimsParser.Result result = ClaimsParser.parse(m, HOSPITAL);
 
             if (result instanceof ClaimsParser.Invalid invalid) {
                 assertTrue(invalid.code().matches("[a-z-]+"), "a code, never the value");
@@ -249,11 +263,13 @@ class ClaimsParserTest {
     void theValueRefusesWhatTheParserWouldRefuse() {
         UUID t = UUID.randomUUID();
 
-        assertThrows(IllegalArgumentException.class, () -> new Claims("a b", t, Set.of(), Set.of(), null, null, null));
-        assertThrows(NullPointerException.class, () -> new Claims("u", null, Set.of(), Set.of(), null, null, null));
-        assertThrows(NullPointerException.class, () -> new Claims("u", t, null, Set.of(), null, null, null));
-        assertThrows(IllegalArgumentException.class, () -> new Claims("u", t, Set.of("a\nb"), Set.of(), null, null, null));
-        assertThrows(IllegalArgumentException.class, () -> new Claims("u", t, Set.of(), Set.of(), "p q", null, null));
+        assertThrows(IllegalArgumentException.class, () -> new Claims("a b", t, Set.of()));
+        assertThrows(NullPointerException.class, () -> new Claims("u", null, Set.of()));
+        assertThrows(NullPointerException.class, () -> new Claims("u", t, null));
+        assertThrows(IllegalArgumentException.class, () -> new Claims("u", t, Set.of("a\nb")));
+        assertThrows(IllegalArgumentException.class, () -> new Claims("u", t, Set.of(), Map.of("ok", Set.of("p q")), null));
+        assertThrows(IllegalArgumentException.class, () -> new Claims("u", t, Set.of(), Map.of("Bad Name", Set.of("p")), null));
+        assertThrows(NullPointerException.class, () -> new Claims("u", t, Set.of(), null, null));
     }
 
     @Test
@@ -269,11 +285,11 @@ class ClaimsParserTest {
     }
 
     @Test
-    void toStringShowsIdsAndCountsAndNeverTheRegistryId() {
+    void toStringShowsIdsAndCountsAndNeverAnAttributeValue() {
         String text = valid(full()).withPurpose("CARE_RECORD").toString();
 
-        assertTrue(text.contains("user-1") && text.contains(TENANT) && text.contains("CARE_RECORD"));
-        assertFalse(text.contains("hpr@example.in") || text.contains("p-77"));
+        assertTrue(text.contains("user-1") && text.contains(TENANT) && text.contains("CARE_RECORD") && text.contains("facility_ids=2"));
+        assertFalse(text.contains("hpr@example.in") || text.contains("p-77") || text.contains("f1"));
     }
 
     @Test

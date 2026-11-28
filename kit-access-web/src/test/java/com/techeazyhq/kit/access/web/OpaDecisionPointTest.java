@@ -42,7 +42,7 @@ class OpaDecisionPointTest {
             sent.set(request);
             return Mono.just(ClientResponse.create(status).header("Content-Type", MediaType.APPLICATION_JSON_VALUE).body(json).build());
         });
-        return new OpaDecisionPoint(builder, base, "ogh/access/decision");
+        return new OpaDecisionPoint(builder, base, "acme/access/decision");
     }
 
     @Test
@@ -54,7 +54,7 @@ class OpaDecisionPointTest {
             assertTrue(d.allow());
             assertEquals(true, d.obligations().get("audit"));
         }).verifyComplete();
-        assertEquals("http://localhost:8181/v1/data/ogh/access/decision", sent.get().url().toString());
+        assertEquals("http://localhost:8181/v1/data/acme/access/decision", sent.get().url().toString());
         assertEquals("POST", sent.get().method().name());
     }
 
@@ -88,7 +88,7 @@ class OpaDecisionPointTest {
 
     @Test
     void theRulePathCannotBeUsedToReachAnotherEndpoint() {
-        for (String bad : new String[] {"../admin", "ogh/access?x=1", "", "a b"}) {
+        for (String bad : new String[] {"../admin", "acme/access?x=1", "", "a b"}) {
             assertThrows(IllegalArgumentException.class,
                     () -> new OpaDecisionPoint(WebClient.builder(), "http://localhost:8181", bad), bad);
         }

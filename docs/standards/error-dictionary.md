@@ -34,12 +34,12 @@ FHIR endpoints answer an `OperationOutcome` built by `OperationOutcomes`: `issue
 ## Layers
 
 1. **Base** (`kit-web`, `META-INF/techeazy/base-error-dictionary.json`): the generic codes every product raises the same way (`malformed-request`, `unauthenticated`, `forbidden`, `not-found`, `conflict`, `quota-exceeded`, `dependency-unavailable`, `internal-error`, and more).
-2. **Product** (`META-INF/techeazy/error-dictionary.json` in the product's service module): names the product (`"product": "ogh"`) and adds its own codes. Any module on the class path may contribute one file; a code listed twice, or two different product names, stops the service at start-up.
+2. **Product** (`META-INF/techeazy/error-dictionary.json` in the product's service module): names the product (`"product": "acme"`) and adds its own codes. Any module on the class path may contribute one file; a code listed twice, or two different product names, stops the service at start-up.
 
 ## Rules
 
 - Codes are lower-case words joined by hyphens, **never renamed or reused once released**. One code has one status.
-- Titles are short, have no full stop, never carry personal or clinical data, and are translated by code.
+- Titles are short, have no full stop, never carry personal or sensitive data, and are translated by code.
 - Status use: 400 malformed, 401 unauthenticated, 403 forbidden, 404 not found, 409 conflict, 422 business-rule failure, 429 rate limit with `Retry-After`, 503 dependency unavailable with `Retry-After` (never used to mean "denied").
 - Operational log codes are `TZ-...` (shared) or `<PRODUCT>-...`, in square brackets at the start of a message.
 

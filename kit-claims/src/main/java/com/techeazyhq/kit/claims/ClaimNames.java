@@ -18,33 +18,41 @@
 
 package com.techeazyhq.kit.claims;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
  * Where each part of {@link Claims} is in a token. The defaults are the plain names ({@code sub}, {@code tenant_id},
- * {@code facility_ids}, {@code roles}, {@code practitioner_id}, {@code hpr_id}); a product whose identity provider uses other
- * names, or Keycloak's {@code realm_access.roles}, says so here and nowhere else.
+ * {@code roles}) and no attributes; a product says which attributes it reads and where ({@link #withAttribute}), and, if its
+ * identity provider uses other names, or Keycloak's {@code realm_access.roles}, says so here and nowhere else.
  *
- * @param rolesPath the keys to walk to the roles, for example {@code ["roles"]} or {@code ["realm_access", "roles"]}
+ * @param rolesPath  the keys to walk to the roles, for example {@code ["roles"]} or {@code ["realm_access", "roles"]}
+ * @param attributes the product's attributes: the name it reads them by, to the claim that holds them
  */
-public record ClaimNames(String subject, String tenantId, String facilityIds, List<String> rolesPath, String practitionerId,
-                         String hprId) {
+public record ClaimNames(String subject, String tenantId, List<String> rolesPath, Map<String, String> attributes) {
 
     public ClaimNames {
         Objects.requireNonNull(subject, "subject");
         Objects.requireNonNull(tenantId, "tenantId");
-        Objects.requireNonNull(facilityIds, "facilityIds");
-        Objects.requireNonNull(practitionerId, "practitionerId");
-        Objects.requireNonNull(hprId, "hprId");
         if (rolesPath == null || rolesPath.isEmpty()) {
             throw new IllegalArgumentException("rolesPath names at least one key");
         }
         rolesPath = List.copyOf(rolesPath);
+        Objects.requireNonNull(attributes, "attributes");
+        for (Map.Entry<String, String> entry : attributes.entrySet()) {
+            if (!Claims.isAttributeName(entry.getKey())) {
+                throw new IllegalArgumentException("an attribute name is lower case letters, digits and underscores, at most 64");
+            }
+            Objects.requireNonNull(entry.getValue(), "the claim of attribute " + entry.getKey());
+        }
+        attributes = Collections.unmodifiableMap(new LinkedHashMap<>(attributes));
     }
 
     public static ClaimNames defaults() {
-        return new ClaimNames("sub", "tenant_id", "facility_ids", List.of("roles"), "practitioner_id", "hpr_id");
+        return new ClaimNames("sub", "tenant_id", List.of("roles"), Map.of());
     }
 
     /** The same names with the roles where Keycloak puts the realm roles by default. */
@@ -53,6 +61,13 @@ public record ClaimNames(String subject, String tenantId, String facilityIds, Li
     }
 
     public ClaimNames withRolesPath(String... path) {
-        return new ClaimNames(subject, tenantId, facilityIds, List.of(path), practitionerId, hprId);
+        return new ClaimNames(subject, tenantId, List.of(path), attributes);
+    }
+
+    /** The same names, also reading the attribute {@code name} from the claim {@code claim}. */
+    public ClaimNames withAttribute(String name, String claim) {
+        Map<String, String> more = new LinkedHashMap<>(attributes);
+        more.put(name, claim);
+        return new ClaimNames(subject, tenantId, rolesPath, more);
     }
 }

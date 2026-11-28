@@ -25,13 +25,14 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * One use of break-glass: who, to whose record, what they did, why (a reason code from the product's closed list, whose
+ * One use of break-glass: who, to whose record ({@code subjectRef}, the person it is about), in which unit of the organisation
+ * ({@code scopeId}: a site, branch or campus; null when the product has none), what they did, why (a reason code from the product's closed list, whose
  * values the product's access policy owns), and the justification they gave. It is the record the
- * reviewer reads, and it is health data (data class D4): the justification is free text and may say what was wrong with the
- * patient, so it is kept here and in the review store (encrypted at rest, EP-08-02), never in an event, a log line or
+ * reviewer reads, and it is sensitive data: the justification is free text and may say what was going on with the
+ * person, so it is kept here and in the review store (encrypted at rest, EP-08-02), never in an event, a log line or
  * {@link #toString()}. What leaves this record is {@link #toEvent()}, which holds ids and codes only.
  */
-public record BreakGlassRecord(UUID id, UUID tenantId, UUID facilityId, UUID accessorUserId, String patientRef,
+public record BreakGlassRecord(UUID id, UUID tenantId, UUID scopeId, UUID accessorUserId, String subjectRef,
                                String resourceType, String action, String reason, String justification,
                                Instant occurredAt, String correlationId) {
 
@@ -47,9 +48,8 @@ public record BreakGlassRecord(UUID id, UUID tenantId, UUID facilityId, UUID acc
     public BreakGlassRecord {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(tenantId, "tenantId");
-        Objects.requireNonNull(facilityId, "facilityId");
         Objects.requireNonNull(accessorUserId, "accessorUserId");
-        opaque(patientRef, "patientRef");
+        opaque(subjectRef, "subjectRef");
         opaque(resourceType, "resourceType");
         opaque(action, "action");
         if (reason == null || !CODE.matcher(reason).matches()) {
@@ -69,14 +69,14 @@ public record BreakGlassRecord(UUID id, UUID tenantId, UUID facilityId, UUID acc
         return occurredAt.plus(REVIEW_SLA);
     }
 
-    /** What may be published: ids and codes, no justification, so no health data. */
+    /** What may be published: ids and codes, no justification, so no sensitive data. */
     public Event toEvent() {
-        return new Event(id, tenantId, facilityId, accessorUserId, patientRef, resourceType, action, reason, occurredAt,
+        return new Event(id, tenantId, scopeId, accessorUserId, subjectRef, resourceType, action, reason, occurredAt,
                 reviewDueAt(), correlationId);
     }
 
     /** The thin event (standard: events carry references, not PHI). */
-    public record Event(UUID id, UUID tenantId, UUID facilityId, UUID accessorUserId, String patientRef,
+    public record Event(UUID id, UUID tenantId, UUID scopeId, UUID accessorUserId, String subjectRef,
                         String resourceType, String action, String reason, Instant occurredAt, Instant reviewDueAt,
                         String correlationId) {
     }

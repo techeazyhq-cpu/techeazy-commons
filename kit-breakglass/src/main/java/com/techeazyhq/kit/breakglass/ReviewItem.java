@@ -24,7 +24,7 @@ import java.util.UUID;
 
 /**
  * A break-glass waiting for, or past, its review. Immutable: a review produces a new item. {@code reviewerNote} is free text
- * and may be health data (D4), so, like the record's justification, it never appears in {@link #toString()}.
+ * and may be sensitive data, so, like the record's justification, it never appears in {@link #toString()}.
  */
 public record ReviewItem(BreakGlassRecord record, Instant dueAt, Status status, UUID reviewerUserId, Instant reviewedAt,
                          Outcome outcome, String reviewerNote, boolean escalated) {
