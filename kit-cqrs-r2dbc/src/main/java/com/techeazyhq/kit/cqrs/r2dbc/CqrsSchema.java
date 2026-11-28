@@ -36,6 +36,7 @@ public final class CqrsSchema {
                 type           text        NOT NULL,
                 occurred_at    timestamptz NOT NULL,
                 payload        text        NOT NULL,
+                appended_at    timestamptz NOT NULL DEFAULT clock_timestamp(),
                 UNIQUE (tenant_id, aggregate_type, aggregate_id, version)
             );
             CREATE TABLE cqrs_publish_cursor (
@@ -56,6 +57,14 @@ public final class CqrsSchema {
                 PRIMARY KEY (projection, tenant_id, aggregate_type, aggregate_id)
             );
             """;
+
+    /**
+     * For a log created before {@code appended_at} existed (it lets a reader tell a gap that may still be filled from one that
+     * never will: {@link R2dbcEventLog#concurrent}). Existing rows get the time of the migration, old enough for any tolerance by
+     * the time the concurrent mode is used.
+     */
+    public static final String ADD_APPENDED_AT =
+            "ALTER TABLE cqrs_event_log ADD COLUMN IF NOT EXISTS appended_at timestamptz NOT NULL DEFAULT clock_timestamp()";
 
     private CqrsSchema() {
     }
