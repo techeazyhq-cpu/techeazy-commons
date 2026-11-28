@@ -41,9 +41,16 @@ public final class OutboundHttp {
     private OutboundHttp() {
     }
 
-    /** The Reactor Netty client: HTTP/2 over TLS, falling back to HTTP/1.1 over TLS. Never cleartext. */
+    /** The Reactor Netty client with the default timeouts: HTTP/2 over TLS, falling back to HTTP/1.1 over TLS. Never cleartext. */
     public static HttpClient httpClient() {
-        return HttpClient.create().protocol(HttpProtocol.H2, HttpProtocol.HTTP11);
+        return httpClient(OutboundPolicy.defaults());
+    }
+
+    /** As above, and a connection that is not made in {@code connectTimeout}, or an answer that does not come in {@code attemptTimeout}, is cut. */
+    public static HttpClient httpClient(OutboundPolicy policy) {
+        return HttpClient.create().protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
+                .option(io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) policy.connectTimeout().toMillis())
+                .responseTimeout(policy.attemptTimeout());
     }
 
     /** HTTPS and HTTP/2 only, and no host is internal: nothing carries the caller's identity. */
@@ -56,10 +63,19 @@ public final class OutboundHttp {
         return webClientBuilder(httpClient(), internalHosts);
     }
 
-    /** As above with a given Netty client, for a test or a product that tunes it. */
+    /** As above with a given Netty client, for a test or a product that tunes it. The default policy for time, retries and the circuit. */
     public static WebClient.Builder webClientBuilder(HttpClient client, Set<String> internalHosts) {
+        return webClientBuilder(client, OutboundPolicy.defaults(), internalHosts);
+    }
+
+    /** As above with the policy a product chose (TM-15): timeouts, bounded retries, a circuit breaker per host. */
+    public static WebClient.Builder webClientBuilder(OutboundPolicy policy, Set<String> internalHosts) {
+        return webClientBuilder(httpClient(policy), policy, internalHosts);
+    }
+
+    public static WebClient.Builder webClientBuilder(HttpClient client, OutboundPolicy policy, Set<String> internalHosts) {
         return WebClient.builder().clientConnector(new ReactorClientHttpConnector(client)).filter(httpsOnly())
-                .filter(relay(internalHosts));
+                .filter(relay(internalHosts)).filter(new Resilience(policy).filter());
     }
 
     /**

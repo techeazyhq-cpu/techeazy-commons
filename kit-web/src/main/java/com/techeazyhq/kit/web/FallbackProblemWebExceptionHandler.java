@@ -45,6 +45,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   <li>input that could not be read (bad JSON, a parameter of the wrong type): 400 {@code malformed-request};</li>
  *   <li>input the database refuses for what it contains (a NUL character, text it cannot encode, a value too long or out of range,
  *       a malformed number or date): also 400 {@code malformed-request}, since the caller's text is the fault, not the platform's;</li>
+ *   <li>a dependency that cannot be used (timed out, kept failing, circuit open): 503 {@code dependency-unavailable} with {@code Retry-After};</li>
  *   <li>a body over the limit the codecs allow: 413 {@code payload-too-large};</li>
  *   <li>an exception nobody expected: 500 {@code internal-error}, with nothing about it in the answer, and the exception
  *       logged as {@code [TZ-INTERNAL-ERROR]} with the correlation id the caller was given;</li>
@@ -73,6 +74,14 @@ public class FallbackProblemWebExceptionHandler implements WebExceptionHandler {
         }
         if (ex instanceof ResponseStatusException rse && ROUTING_CODES.containsKey(rse.getStatusCode().value())) {
             return routingProblem(exchange, rse);
+        }
+        DependencyUnavailableException unavailable = dependencyUnavailable(ex);
+        if (unavailable != null) {
+            long seconds = Math.max(1, (unavailable.retryAfter().toMillis() + 999) / 1000);
+            response.getHeaders().set("Retry-After", String.valueOf(seconds));
+            return write(exchange, HttpStatus.SERVICE_UNAVAILABLE, Problems.body("dependency-unavailable", 503,
+                    "A service this request needs is not available right now. Nothing was done. Try again later.",
+                    Problems.correlationId(exchange)));
         }
         if (tooLarge(ex)) {
             return write(exchange, HttpStatus.valueOf(413), Problems.body("payload-too-large", 413,
@@ -125,6 +134,18 @@ public class FallbackProblemWebExceptionHandler implements WebExceptionHandler {
      * (an R2DBC exception's {@code getSqlState()}) so this library needs no database driver, and the gateway, which has none,
      * is unaffected.
      */
+    static DependencyUnavailableException dependencyUnavailable(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof DependencyUnavailableException unavailable) {
+                return unavailable;
+            }
+            if (t.getCause() == t) {
+                break;
+            }
+        }
+        return null;
+    }
+
     /** A body over the codec's limit (spring.codec.max-in-memory-size), however many layers wrapped it. */
     static boolean tooLarge(Throwable ex) {
         for (Throwable t = ex; t != null; t = t.getCause()) {
