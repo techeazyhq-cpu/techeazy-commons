@@ -23,5 +23,7 @@ public enum ManualResolution {
     /** The cause is fixed: try the step that failed again, from the first attempt. */
     RETRY,
     /** The work was undone by hand: close the saga as compensated. */
-    MARK_COMPENSATED
+    MARK_COMPENSATED,
+    /** For a forward-only saga: the work was done by hand, close the saga as completed. */
+    MARK_COMPLETED
 }
